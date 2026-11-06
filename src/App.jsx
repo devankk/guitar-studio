@@ -2529,18 +2529,6 @@ export default function App() {
                   </div>
                 )}
 
-                {/* Quick Hint */}
-                {selectedLoginUser === 'user1' && (
-                  <p className="text-[10px] text-[#92929F] text-center font-mono italic">
-                    Hint: Default Master Admin PIN is <code className="text-white font-bold not-italic">7779</code>
-                  </p>
-                )}
-                {selectedLoginUser === 'user2' && (
-                  <p className="text-[10px] text-[#92929F] text-center font-mono italic">
-                    Hint: Default Guitarist 2 PIN is <code className="text-white font-bold not-italic">1111</code>
-                  </p>
-                )}
-
                 <button
                   type="submit"
                   className="w-full py-3.5 rounded-2xl text-white font-extrabold text-xs sm:text-sm font-gx-display tracking-wider uppercase transition-all active:scale-95 flex items-center justify-center gap-2 shadow-2xl"
