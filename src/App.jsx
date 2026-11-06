@@ -16,6 +16,20 @@ import {
 const FONT_STYLES = `
   @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700;800&family=Rajdhani:wght@500;600;700;800&family=Space+Grotesk:wght@500;600;700&display=swap');
 
+  :root {
+    --app-vh: 100dvh;
+  }
+
+  html, body {
+    margin: 0;
+    padding: 0;
+    width: 100%;
+    min-height: 100%;
+    min-height: 100dvh;
+    background-color: #08080C;
+    overflow-x: hidden;
+  }
+
   .font-gx-display {
     font-family: 'Space Grotesk', -apple-system, BlinkMacSystemFont, sans-serif;
     letter-spacing: -0.02em;
@@ -35,6 +49,21 @@ const FONT_STYLES = `
   .font-gx-body {
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
     letter-spacing: -0.01em;
+  }
+
+  /* Fluid typography scaling for extreme viewports */
+  .text-fluid-bpm {
+    font-size: clamp(3.8rem, 9.5vw, 9.5rem);
+    line-height: 0.95;
+  }
+
+  .text-fluid-title {
+    font-size: clamp(1.15rem, 1.8vw, 1.85rem);
+  }
+
+  /* Mobile safe area padding for bottom bar */
+  .safe-area-bottom {
+    padding-bottom: max(0.5rem, env(safe-area-inset-bottom));
   }
 `;
 
@@ -1901,8 +1930,8 @@ export default function App() {
     const dotsCount = subdiv?.dotsPerBeat || 1;
 
     return (
-      <div className="w-full max-w-2xl mx-auto my-3 sm:my-4 select-none">
-        <div className="grid gap-1.5 sm:gap-2.5" style={{ gridTemplateColumns: `repeat(${beatsCount}, minmax(0, 1fr))` }}>
+      <div className="w-full max-w-4xl mx-auto my-2 sm:my-3.5 select-none px-1">
+        <div className="grid gap-1.5 sm:gap-2.5 lg:gap-3" style={{ gridTemplateColumns: `repeat(${beatsCount}, minmax(0, 1fr))` }}>
           {Array.from({ length: beatsCount }).map((_, beatIdx) => {
             const beatNumber = beatIdx + 1;
             const isCurrentBeat = isPlaying && activeDotInfo.beatNumber === beatNumber;
@@ -1930,7 +1959,7 @@ export default function App() {
                 )}
 
                 <div
-                  className="text-[10px] sm:text-xs font-semibold tracking-wider font-gx-code uppercase mb-1.5 transition-colors"
+                  className="text-[10px] sm:text-xs font-semibold tracking-wider font-gx-code uppercase mb-1 sm:mb-1.5 transition-colors"
                   style={{ color: isCurrentBeat ? currentTheme.primary : '#92929F' }}
                 >
                   Beat {beatNumber}
@@ -1977,7 +2006,7 @@ export default function App() {
     const setSettingsOpen = stepNumber === 1 ? setStep1SettingsOpen : stepNumber === 2 ? setStep2SettingsOpen : setStep3SettingsOpen;
 
     return (
-      <div className="space-y-3 pt-2">
+      <div className="space-y-3 pt-2 w-full">
         <div className="flex items-center justify-between gap-2 flex-wrap">
           <div className="flex items-center gap-1 bg-[#101016] p-1 rounded-xl border border-white/5">
             {['standard', 'speed', 'ratios'].map(mode => (
@@ -2007,14 +2036,14 @@ export default function App() {
         </div>
 
         {activeSubTab === 'standard' && (
-          <div className="bg-[#15151D] border border-white/5 rounded-2xl p-3.5 sm:p-5 shadow-xl relative overflow-hidden">
+          <div className="bg-[#15151D] border border-white/5 rounded-2xl p-3 sm:p-5 lg:p-6 shadow-xl relative overflow-hidden w-full">
             <div
-              className="absolute -top-16 left-1/2 -translate-x-1/2 w-48 h-24 rounded-full pointer-events-none blur-3xl opacity-20"
+              className="absolute -top-16 left-1/2 -translate-x-1/2 w-72 h-32 rounded-full pointer-events-none blur-3xl opacity-20"
               style={{ backgroundColor: currentTheme.primary }}
             />
 
             <div className="flex flex-col items-center justify-center pt-1 pb-1 relative z-10">
-              <div className="text-6xl sm:text-8xl font-black font-gx-num tracking-tight text-white leading-none">
+              <div className="text-6xl sm:text-8xl lg:text-9xl font-black font-gx-num tracking-tight text-white leading-none">
                 {currentStepBpm}
               </div>
               <div className="text-[9px] sm:text-[10px] uppercase tracking-widest text-[#92929F] font-bold font-gx-display mt-1">
@@ -2024,8 +2053,8 @@ export default function App() {
 
             {renderDotVisualiser(stepSubdiv, currentStepBpm)}
 
-            <div className="flex flex-col items-center justify-center pt-1 sm:pt-2 relative z-10">
-              <div className="flex items-center gap-1.5 sm:gap-2.5 w-full justify-center max-w-sm">
+            <div className="flex flex-col items-center justify-center pt-1 sm:pt-2 relative z-10 w-full">
+              <div className="flex items-center gap-1.5 sm:gap-2.5 w-full justify-center max-w-md">
                 <button
                   onClick={() => updateStepBpm(stepNumber, currentStepBpm - 5)}
                   className="flex-1 sm:flex-none px-2 sm:px-3 py-2 sm:py-1.5 rounded-xl bg-[#1B1B25] border border-white/5 text-xs font-bold font-gx-num text-white hover:bg-[#252533] hover:border-white/10 active:scale-95 transition-all"
@@ -2066,7 +2095,7 @@ export default function App() {
                 </button>
               </div>
 
-              <div className="w-full max-w-sm mt-3.5 sm:mt-4 flex items-center gap-3">
+              <div className="w-full max-w-md mt-3.5 sm:mt-4 flex items-center gap-3">
                 <input
                   type="range"
                   min="30"
@@ -2141,9 +2170,9 @@ export default function App() {
         )}
 
         {activeSubTab === 'speed' && (
-          <div className="bg-[#15151D] border border-white/5 rounded-2xl p-3.5 sm:p-5 shadow-xl space-y-3">
+          <div className="bg-[#15151D] border border-white/5 rounded-2xl p-3 sm:p-5 lg:p-6 shadow-xl space-y-3 w-full">
             <div className="flex flex-col items-center justify-center pt-1 pb-1">
-              <div className="text-6xl sm:text-8xl font-black font-gx-num tracking-tight text-white leading-none">
+              <div className="text-6xl sm:text-8xl lg:text-9xl font-black font-gx-num tracking-tight text-white leading-none">
                 {speedProgress.isActive ? speedProgress.currentBpm : speedConfig.startBpm}
               </div>
               <div className="text-[9px] sm:text-[10px] uppercase tracking-widest text-[#92929F] font-bold font-gx-display mt-1">
@@ -2238,9 +2267,9 @@ export default function App() {
         )}
 
         {activeSubTab === 'ratios' && (
-          <div className="bg-[#15151D] border border-white/5 rounded-2xl p-3.5 sm:p-5 shadow-xl space-y-3">
+          <div className="bg-[#15151D] border border-white/5 rounded-2xl p-3 sm:p-5 lg:p-6 shadow-xl space-y-3 w-full">
             <div className="flex flex-col items-center justify-center pt-1 pb-1">
-              <div className="text-6xl sm:text-8xl font-black font-gx-num tracking-tight text-white leading-none">
+              <div className="text-6xl sm:text-8xl lg:text-9xl font-black font-gx-num tracking-tight text-white leading-none">
                 {ratiosConfig.bpm}
               </div>
               <div className="text-[9px] sm:text-[10px] uppercase tracking-widest text-[#92929F] font-bold font-gx-display mt-1">
@@ -2281,7 +2310,7 @@ export default function App() {
               )}
             </div>
 
-            <div className="flex items-center justify-center gap-1.5 sm:gap-2.5 w-full max-w-sm mx-auto">
+            <div className="flex items-center justify-center gap-1.5 sm:gap-2.5 w-full max-w-md mx-auto">
               <button
                 onClick={() => {
                   const next = Math.max(30, ratiosConfig.bpm - 5);
@@ -2375,7 +2404,7 @@ export default function App() {
   if (!isAuthenticated) {
     return (
       <div
-        className="min-h-screen text-[#FFFFFF] flex flex-col items-center justify-center p-4 relative overflow-hidden font-gx-body antialiased select-none"
+        className="w-full min-h-[100dvh] text-[#FFFFFF] flex flex-col items-center justify-center p-3 sm:p-6 lg:p-8 relative overflow-hidden font-gx-body antialiased select-none"
         style={{
           backgroundColor: '#08080C',
           backgroundImage: `
@@ -2391,36 +2420,36 @@ export default function App() {
 
         {/* Ambient Top Glow Banner */}
         <div
-          className="absolute -top-32 left-1/2 -translate-x-1/2 w-[550px] h-64 rounded-full pointer-events-none blur-3xl opacity-30"
+          className="absolute -top-32 left-1/2 -translate-x-1/2 w-[550px] sm:w-[700px] h-64 rounded-full pointer-events-none blur-3xl opacity-30"
           style={{ backgroundColor: currentTheme.primary }}
         />
 
-        <div className="max-w-md w-full relative z-10 animate-in fade-in zoom-in-95 duration-300">
+        <div className="w-full max-w-lg relative z-10 animate-in fade-in zoom-in-95 duration-300">
           {/* Studio Brand Header */}
-          <div className="text-center mb-6">
+          <div className="text-center mb-5 sm:mb-7">
             <div
-              className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-3 shadow-2xl transition-transform hover:scale-105"
+              className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl flex items-center justify-center mx-auto mb-3 shadow-2xl transition-transform hover:scale-105"
               style={{
                 backgroundColor: currentTheme.primary,
                 boxShadow: `0 0 30px ${currentTheme.glow}`
               }}
             >
-              <Music className="w-8 h-8 text-white stroke-[2.2]" />
+              <Music className="w-7 h-7 sm:w-8 sm:h-8 text-white stroke-[2.2]" />
             </div>
 
-            <h1 className="text-xl sm:text-2xl font-black tracking-tight text-white font-gx-display uppercase">
+            <h1 className="text-xl sm:text-2xl lg:text-3xl font-black tracking-tight text-white font-gx-display uppercase">
               Wannabe Guitarist's Studio
             </h1>
-            <p className="text-xs text-[#92929F] mt-1 font-gx-display flex items-center justify-center gap-1.5 font-semibold">
+            <p className="text-xs sm:text-sm text-[#92929F] mt-1 font-gx-display flex items-center justify-center gap-1.5 font-semibold">
               <Lock className="w-3.5 h-3.5 text-[#10B981]" />
               Secure Profile Gateway &bull; Opera GX Audio Engine
             </p>
           </div>
 
           {/* Main Card */}
-          <div className="bg-[#15151D]/90 backdrop-blur-xl border border-white/10 rounded-3xl p-5 sm:p-7 shadow-2xl relative overflow-hidden">
+          <div className="bg-[#15151D]/90 backdrop-blur-xl border border-white/10 rounded-3xl p-5 sm:p-7 lg:p-8 shadow-2xl relative overflow-hidden w-full">
             <div className="text-center mb-5">
-              <span className="text-[10px] font-mono font-bold tracking-widest uppercase text-[#92929F] block mb-1">
+              <span className="text-[10px] sm:text-xs font-mono font-bold tracking-widest uppercase text-[#92929F] block mb-1">
                 STEP 1: SELECT YOUR PROFILE
               </span>
               <p className="text-xs text-[#92929F]">
@@ -2445,7 +2474,7 @@ export default function App() {
                       setLoginPinInput('');
                       audioEngine.playUiSound('step');
                     }}
-                    className={`p-3.5 rounded-2xl border text-left transition-all relative flex flex-col justify-between ${
+                    className={`p-3.5 sm:p-4 rounded-2xl border text-left transition-all relative flex flex-col justify-between ${
                       isSelected
                         ? 'bg-[#1B1B25] border-white/40 shadow-xl'
                         : 'bg-[#101016]/90 border-white/5 opacity-80 hover:opacity-100 hover:border-white/15'
@@ -2457,7 +2486,7 @@ export default function App() {
                   >
                     <div className="flex items-center justify-between mb-2">
                       <div
-                        className="w-7 h-7 rounded-xl flex items-center justify-center font-bold text-xs"
+                        className="w-7 h-7 sm:w-8 sm:h-8 rounded-xl flex items-center justify-center font-bold text-xs"
                         style={{
                           backgroundColor: isUserAdmin ? currentTheme.accentBg : '#3B82F625',
                           color: isUserAdmin ? currentTheme.primary : '#3B82F6'
@@ -2507,7 +2536,7 @@ export default function App() {
                         placeholder="••••"
                         value={loginPinInput}
                         onChange={(e) => setLoginPinInput(e.target.value)}
-                        className="w-full bg-[#101016] border border-white/10 rounded-2xl py-3 text-center text-xl tracking-[0.4em] font-mono text-white focus:outline-none transition-all shadow-inner"
+                        className="w-full bg-[#101016] border border-white/10 rounded-2xl py-3 sm:py-3.5 text-center text-xl sm:text-2xl tracking-[0.4em] font-mono text-white focus:outline-none transition-all shadow-inner"
                         style={{
                           borderColor: loginErrorMessage ? '#EF4444' : currentTheme.borderActive
                         }}
@@ -2521,7 +2550,6 @@ export default function App() {
                   )}
                 </div>
 
-                {/* Feedback Message */}
                 {loginErrorMessage && (
                   <div className="bg-[#EF4444]/15 border border-[#EF4444]/30 text-[#EF4444] text-xs py-2 px-3 rounded-xl font-mono font-bold text-center flex items-center justify-center gap-1.5 animate-bounce">
                     <ShieldAlert className="w-4 h-4 flex-shrink-0" />
@@ -2531,7 +2559,7 @@ export default function App() {
 
                 <button
                   type="submit"
-                  className="w-full py-3.5 rounded-2xl text-white font-extrabold text-xs sm:text-sm font-gx-display tracking-wider uppercase transition-all active:scale-95 flex items-center justify-center gap-2 shadow-2xl"
+                  className="w-full py-3.5 sm:py-4 rounded-2xl text-white font-extrabold text-xs sm:text-sm font-gx-display tracking-wider uppercase transition-all active:scale-95 flex items-center justify-center gap-2 shadow-2xl"
                   style={{
                     backgroundColor: currentTheme.primary,
                     boxShadow: `0 0 25px ${currentTheme.glow}`
@@ -2544,7 +2572,6 @@ export default function App() {
             )}
           </div>
 
-          {/* Theme Palette Bar on Lock Screen */}
           <div className="flex items-center justify-center gap-2 mt-5">
             <span className="text-[10px] uppercase font-bold text-[#92929F] font-mono mr-1">Theme:</span>
             {Object.values(GX_THEMES).map(t => (
@@ -2568,7 +2595,7 @@ export default function App() {
 
   return (
     <div
-      className="min-h-screen text-[#FFFFFF] flex flex-col font-gx-body antialiased selection:bg-[#FA1E4E]/30 selection:text-white pb-24 md:pb-8 relative overflow-x-hidden"
+      className="w-full min-h-[100dvh] text-[#FFFFFF] flex flex-col font-gx-body antialiased selection:bg-[#FA1E4E]/30 selection:text-white pb-20 md:pb-6 relative overflow-x-hidden"
       style={{
         backgroundColor: '#08080C',
         backgroundImage: `
@@ -2583,10 +2610,10 @@ export default function App() {
       <style>{FONT_STYLES}</style>
 
       {/* Top Header / Sticky Nav */}
-      <header className="sticky top-0 z-50 bg-[#101016]/90 backdrop-blur-md border-b border-white/5 px-3 sm:px-6 lg:px-8 py-2.5 sm:py-3.5 flex items-center justify-between shadow-2xl">
-        <div className="flex items-center gap-2.5 sm:gap-3">
+      <header className="sticky top-0 z-50 bg-[#101016]/95 backdrop-blur-md border-b border-white/5 px-3 sm:px-6 lg:px-10 py-2 sm:py-3 flex items-center justify-between shadow-2xl w-full">
+        <div className="flex items-center gap-2.5 sm:gap-3.5">
           <div
-            className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl flex items-center justify-center flex-shrink-0 transition-transform hover:scale-105"
+            className="w-8 h-8 sm:w-9 sm:h-9 lg:w-10 lg:h-10 rounded-xl flex items-center justify-center flex-shrink-0 transition-transform hover:scale-105"
             style={{
               backgroundColor: currentTheme.primary,
               boxShadow: `0 0 16px ${currentTheme.glow}`
@@ -2596,7 +2623,7 @@ export default function App() {
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <h1 className="text-xs sm:text-base font-extrabold tracking-tight text-white leading-tight font-gx-display">
+              <h1 className="text-xs sm:text-base lg:text-lg font-extrabold tracking-tight text-white leading-tight font-gx-display">
                 WANNABE GUITARIST'S STUDIO
               </h1>
               <span
@@ -2635,7 +2662,7 @@ export default function App() {
                   setActiveTab(tab.id);
                   if (tab.id === 'metronome') setActiveMetronomeMode('standard');
                 }}
-                className="flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-semibold font-gx-display transition-all relative overflow-hidden"
+                className="flex items-center gap-2 px-3 lg:px-4 py-1.5 rounded-lg text-xs lg:text-sm font-semibold font-gx-display transition-all relative overflow-hidden"
                 style={{
                   backgroundColor: isActive ? '#1B1B25' : 'transparent',
                   color: isActive ? currentTheme.primary : '#92929F',
@@ -2648,7 +2675,7 @@ export default function App() {
                     style={{ backgroundColor: currentTheme.primary }}
                   />
                 )}
-                <Icon className="w-3.5 h-3.5" />
+                <Icon className="w-3.5 h-3.5 lg:w-4 lg:h-4" />
                 {tab.label}
               </button>
             );
@@ -2656,8 +2683,8 @@ export default function App() {
         </nav>
 
         {/* Profile Switcher, Sync & GX Themes */}
-        <div className="flex items-center gap-2">
-          {/* User Profile Switcher Button with Lock Status */}
+        <div className="flex items-center gap-1.5 sm:gap-2">
+          {/* User Profile Switcher Button */}
           <button
             onClick={() => setIsProfileModalOpen(true)}
             className="p-1.5 sm:px-2.5 sm:py-1.5 rounded-xl bg-[#15151D] border border-white/10 hover:border-white/20 text-white flex items-center gap-1.5 transition-all text-xs"
@@ -2682,7 +2709,7 @@ export default function App() {
             )}
           </button>
 
-          {/* Quick Lock / Sign Out Button back to Lock Gateway */}
+          {/* Quick Lock / Sign Out Button */}
           <button
             onClick={handleLockStudio}
             className="p-1.5 sm:px-2.5 sm:py-1.5 rounded-xl bg-[#15151D] border border-white/10 hover:border-[#EF4444]/40 hover:text-[#EF4444] text-[#92929F] flex items-center gap-1.5 transition-all text-xs"
@@ -2717,7 +2744,7 @@ export default function App() {
                   boxShadow: `0 0 8px ${currentTheme.primary}`
                 }}
               />
-              <span className="hidden sm:inline text-[11px] font-gx-display font-bold">{currentTheme.name}</span>
+              <span className="hidden lg:inline text-[11px] font-gx-display font-bold">{currentTheme.name}</span>
               <Palette className="w-3 h-3 ml-0.5" />
             </button>
 
@@ -2758,7 +2785,7 @@ export default function App() {
 
           <button
             onClick={() => togglePlay(bpm, selectedSubdivision)}
-            className="px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all active:scale-95 border font-gx-num"
+            className="px-2.5 sm:px-3.5 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all active:scale-95 border font-gx-num"
             style={{
               backgroundColor: isPlaying ? '#EF4444' : '#15151D',
               color: isPlaying ? '#FFFFFF' : currentTheme.primary,
@@ -2772,21 +2799,21 @@ export default function App() {
         </div>
       </header>
 
-      {/* Main Content Area */}
-      <main className="flex-1 max-w-7xl w-full mx-auto p-3 sm:p-6 lg:p-8 relative z-10">
+      {/* Main Content Area: Responsive Fluid Container spanning Full Viewport */}
+      <main className="flex-1 w-full max-w-[1920px] mx-auto px-3 sm:px-6 lg:px-10 py-3 sm:py-5 relative z-10 flex flex-col">
         {/* MODULE 1: DAILY PRACTICE DASHBOARD */}
         {activeTab === 'daily' && (
-          <div className="space-y-4 sm:space-y-6">
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-3 pb-1">
+          <div className="space-y-3 sm:space-y-5 w-full flex-1">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 pb-1">
               <div>
-                <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-white font-mono flex items-center gap-2">
-                  <Activity className="w-5 h-5" style={{ color: currentTheme.primary }} />
+                <h2 className="text-xl sm:text-2xl lg:text-3xl font-bold tracking-tight text-white font-mono flex items-center gap-2">
+                  <Activity className="w-5 h-5 lg:w-6 lg:h-6" style={{ color: currentTheme.primary }} />
                   Daily Practice Routine
                 </h2>
                 <p className="text-xs sm:text-sm text-[#92929F]">4-Step Mastery Pipeline &bull; Audio engine synchronized</p>
               </div>
 
-              <div className="flex items-center justify-between sm:justify-start gap-2 bg-[#15151D] border border-white/5 px-3.5 py-1.5 sm:py-2 rounded-xl text-xs shadow-lg">
+              <div className="flex items-center justify-between sm:justify-start gap-2 bg-[#15151D] border border-white/5 px-3.5 py-1.5 sm:py-2 rounded-xl text-xs sm:text-sm shadow-lg">
                 <span className="text-[#92929F]">Progress:</span>
                 <span className="font-bold font-mono" style={{ color: currentTheme.primary }}>
                   {[
@@ -2799,7 +2826,7 @@ export default function App() {
               </div>
             </div>
 
-            <div className="bg-[#15151D] border border-white/5 p-3.5 sm:p-4 rounded-2xl flex flex-col md:flex-row md:items-center justify-between gap-3 shadow-xl">
+            <div className="bg-[#15151D] border border-white/5 p-3.5 sm:p-4 rounded-2xl flex flex-col md:flex-row md:items-center justify-between gap-3 shadow-xl w-full">
               <div className="flex items-center gap-2.5">
                 <div
                   className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0"
@@ -2811,10 +2838,10 @@ export default function App() {
                   <div className="text-[10px] uppercase font-semibold text-[#92929F] tracking-wider font-mono">
                     Target Exercise
                   </div>
-                  <div className="text-sm font-bold text-white font-mono flex items-center gap-2">
+                  <div className="text-sm sm:text-base font-bold text-white font-mono flex items-center gap-2">
                     <span>{practiceSession.selectedExerciseName || 'Custom / Free Routine'}</span>
                     <span
-                      className="text-[9px] px-2 py-0.5 rounded-full border font-mono font-bold"
+                      className="text-[9px] sm:text-[10px] px-2 py-0.5 rounded-full border font-mono font-bold"
                       style={{
                         backgroundColor: currentTheme.accentBg,
                         borderColor: currentTheme.borderActive,
@@ -2827,7 +2854,7 @@ export default function App() {
                 </div>
               </div>
 
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 w-full md:w-auto">
                 <select
                   value={practiceSession.selectedExerciseId || 'custom'}
                   onChange={(e) => {
@@ -2843,7 +2870,7 @@ export default function App() {
                       }));
                     }
                   }}
-                  className="bg-[#101016] border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:outline-none font-mono"
+                  className="bg-[#101016] border border-white/10 rounded-xl px-3 py-2 text-xs sm:text-sm text-white focus:outline-none font-mono w-full md:w-auto"
                 >
                   <option value="custom">Select from Exercise Library...</option>
                   {exercises.map(ex => (
@@ -2856,17 +2883,17 @@ export default function App() {
             </div>
 
             {/* STEP 1 */}
-            <div className="bg-[#15151D] border border-white/5 rounded-2xl p-4 sm:p-5 shadow-xl transition-all">
+            <div className="bg-[#15151D] border border-white/5 rounded-2xl p-4 sm:p-5 lg:p-6 shadow-xl transition-all w-full">
               <div
                 onClick={() => setCurrentStepOpen(currentStepOpen === 1 ? 0 : 1)}
                 className="flex items-center justify-between cursor-pointer"
               >
                 <div className="flex items-center gap-2.5">
-                  <div className="w-7 h-7 rounded-xl bg-[#10B981]/15 text-[#10B981] font-mono font-bold text-xs flex items-center justify-center border border-[#10B981]/30">
+                  <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-xl bg-[#10B981]/15 text-[#10B981] font-mono font-bold text-xs sm:text-sm flex items-center justify-center border border-[#10B981]/30">
                     1
                   </div>
                   <div>
-                    <h3 className="text-sm sm:text-base font-bold text-white font-mono flex items-center gap-2">
+                    <h3 className="text-sm sm:text-base lg:text-lg font-bold text-white font-mono flex items-center gap-2">
                       Step 1: Comfort Zone Warmup
                       {practiceSession.step1.isCompleted && (
                         <CheckCircle2 className="w-4 h-4 text-[#10B981]" />
@@ -2876,7 +2903,7 @@ export default function App() {
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
-                  <span className="text-xs font-mono font-bold text-[#10B981]">{practiceSession.step1.bpm} BPM</span>
+                  <span className="text-xs sm:text-sm font-mono font-bold text-[#10B981]">{practiceSession.step1.bpm} BPM</span>
                   {currentStepOpen === 1 ? <ChevronUp className="w-4 h-4 text-[#92929F]" /> : <ChevronDown className="w-4 h-4 text-[#92929F]" />}
                 </div>
               </div>
@@ -2887,7 +2914,7 @@ export default function App() {
                     <div className="flex items-center gap-2">
                       <Clock className="w-4 h-4 text-[#10B981]" />
                       <span className="text-xs text-[#92929F]">Timer:</span>
-                      <span className="font-mono font-bold text-sm text-white">
+                      <span className="font-mono font-bold text-sm sm:text-base text-white">
                         {Math.floor(practiceSession.step1.remainingSeconds / 60)}:
                         {String(practiceSession.step1.remainingSeconds % 60).padStart(2, '0')}
                       </span>
@@ -2898,7 +2925,7 @@ export default function App() {
                         <button
                           key={mins}
                           onClick={() => handleTimerDurationChange('step1', mins)}
-                          className={`px-2 py-1 rounded-lg text-[10px] font-mono font-bold border ${
+                          className={`px-2 sm:px-2.5 py-1 rounded-lg text-[10px] sm:text-xs font-mono font-bold border ${
                             practiceSession.step1.durationMinutes === mins
                               ? 'bg-[#10B981]/20 border-[#10B981] text-[#10B981]'
                               : 'bg-[#1B1B25] border-white/5 text-[#92929F] hover:text-white'
@@ -2910,14 +2937,14 @@ export default function App() {
 
                       <button
                         onClick={() => toggleTimer('step1')}
-                        className="px-3 py-1 rounded-lg text-xs font-bold font-mono text-white ml-1"
+                        className="px-3 py-1 rounded-lg text-xs sm:text-sm font-bold font-mono text-white ml-1"
                         style={{ backgroundColor: practiceSession.step1.isTimerRunning ? '#EF4444' : '#10B981' }}
                       >
                         {practiceSession.step1.isTimerRunning ? 'Pause' : 'Start Timer'}
                       </button>
                       <button
                         onClick={() => resetTimer('step1')}
-                        className="p-1 rounded-lg bg-[#1B1B25] text-[#92929F] hover:text-white"
+                        className="p-1 sm:p-1.5 rounded-lg bg-[#1B1B25] text-[#92929F] hover:text-white"
                         title="Reset Timer"
                       >
                         <RotateCcw className="w-3.5 h-3.5" />
@@ -2926,15 +2953,15 @@ export default function App() {
                   </div>
 
                   <div>
-                    <label className="text-[10px] uppercase font-semibold text-[#92929F] mb-1.5 block">Focus Areas</label>
-                    <div className="flex flex-wrap gap-1.5">
+                    <label className="text-[10px] sm:text-xs uppercase font-semibold text-[#92929F] mb-1.5 block">Focus Areas</label>
+                    <div className="flex flex-wrap gap-1.5 sm:gap-2">
                       {INITIAL_FOCUS_STEP1.map(tag => {
                         const isSelected = practiceSession.step1.focusAreas.includes(tag);
                         return (
                           <button
                             key={tag}
                             onClick={() => toggleFocusArea('step1', tag)}
-                            className={`px-2.5 py-1 rounded-lg text-[11px] font-medium border transition-all ${
+                            className={`px-2.5 py-1 sm:py-1.5 rounded-lg text-[11px] sm:text-xs font-medium border transition-all ${
                               isSelected
                                 ? 'bg-[#10B981]/15 border-[#10B981] text-[#10B981]'
                                 : 'bg-[#101016] border-white/5 text-[#92929F] hover:text-white'
@@ -2953,17 +2980,17 @@ export default function App() {
             </div>
 
             {/* STEP 2 */}
-            <div className="bg-[#15151D] border border-white/5 rounded-2xl p-4 sm:p-5 shadow-xl transition-all">
+            <div className="bg-[#15151D] border border-white/5 rounded-2xl p-4 sm:p-5 lg:p-6 shadow-xl transition-all w-full">
               <div
                 onClick={() => setCurrentStepOpen(currentStepOpen === 2 ? 0 : 2)}
                 className="flex items-center justify-between cursor-pointer"
               >
                 <div className="flex items-center gap-2.5">
-                  <div className="w-7 h-7 rounded-xl bg-[#3B82F6]/15 text-[#3B82F6] font-mono font-bold text-xs flex items-center justify-center border border-[#3B82F6]/30">
+                  <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-xl bg-[#3B82F6]/15 text-[#3B82F6] font-mono font-bold text-xs sm:text-sm flex items-center justify-center border border-[#3B82F6]/30">
                     2
                   </div>
                   <div>
-                    <h3 className="text-sm sm:text-base font-bold text-white font-mono flex items-center gap-2">
+                    <h3 className="text-sm sm:text-base lg:text-lg font-bold text-white font-mono flex items-center gap-2">
                       Step 2: Edge of Ability
                       {practiceSession.step2.isCompleted && (
                         <CheckCircle2 className="w-4 h-4 text-[#3B82F6]" />
@@ -2973,7 +3000,7 @@ export default function App() {
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
-                  <span className="text-xs font-mono font-bold text-[#3B82F6]">{practiceSession.step2.bpm} BPM</span>
+                  <span className="text-xs sm:text-sm font-mono font-bold text-[#3B82F6]">{practiceSession.step2.bpm} BPM</span>
                   {currentStepOpen === 2 ? <ChevronUp className="w-4 h-4 text-[#92929F]" /> : <ChevronDown className="w-4 h-4 text-[#92929F]" />}
                 </div>
               </div>
@@ -2984,7 +3011,7 @@ export default function App() {
                     <div className="flex items-center gap-2">
                       <Clock className="w-4 h-4 text-[#3B82F6]" />
                       <span className="text-xs text-[#92929F]">Timer:</span>
-                      <span className="font-mono font-bold text-sm text-white">
+                      <span className="font-mono font-bold text-sm sm:text-base text-white">
                         {Math.floor(practiceSession.step2.remainingSeconds / 60)}:
                         {String(practiceSession.step2.remainingSeconds % 60).padStart(2, '0')}
                       </span>
@@ -2995,7 +3022,7 @@ export default function App() {
                         <button
                           key={mins}
                           onClick={() => handleTimerDurationChange('step2', mins)}
-                          className={`px-2 py-1 rounded-lg text-[10px] font-mono font-bold border ${
+                          className={`px-2 sm:px-2.5 py-1 rounded-lg text-[10px] sm:text-xs font-mono font-bold border ${
                             practiceSession.step2.durationMinutes === mins
                               ? 'bg-[#3B82F6]/20 border-[#3B82F6] text-[#3B82F6]'
                               : 'bg-[#1B1B25] border-white/5 text-[#92929F] hover:text-white'
@@ -3007,14 +3034,14 @@ export default function App() {
 
                       <button
                         onClick={() => toggleTimer('step2')}
-                        className="px-3 py-1 rounded-lg text-xs font-bold font-mono text-white ml-1"
+                        className="px-3 py-1 rounded-lg text-xs sm:text-sm font-bold font-mono text-white ml-1"
                         style={{ backgroundColor: practiceSession.step2.isTimerRunning ? '#EF4444' : '#3B82F6' }}
                       >
                         {practiceSession.step2.isTimerRunning ? 'Pause' : 'Start Timer'}
                       </button>
                       <button
                         onClick={() => resetTimer('step2')}
-                        className="p-1 rounded-lg bg-[#1B1B25] text-[#92929F] hover:text-white"
+                        className="p-1 sm:p-1.5 rounded-lg bg-[#1B1B25] text-[#92929F] hover:text-white"
                         title="Reset Timer"
                       >
                         <RotateCcw className="w-3.5 h-3.5" />
@@ -3023,15 +3050,15 @@ export default function App() {
                   </div>
 
                   <div>
-                    <label className="text-[10px] uppercase font-semibold text-[#92929F] mb-1.5 block">Focus Areas</label>
-                    <div className="flex flex-wrap gap-1.5">
+                    <label className="text-[10px] sm:text-xs uppercase font-semibold text-[#92929F] mb-1.5 block">Focus Areas</label>
+                    <div className="flex flex-wrap gap-1.5 sm:gap-2">
                       {INITIAL_FOCUS_STEP2.map(tag => {
                         const isSelected = practiceSession.step2.focusAreas.includes(tag);
                         return (
                           <button
                             key={tag}
                             onClick={() => toggleFocusArea('step2', tag)}
-                            className={`px-2.5 py-1 rounded-lg text-[11px] font-medium border transition-all ${
+                            className={`px-2.5 py-1 sm:py-1.5 rounded-lg text-[11px] sm:text-xs font-medium border transition-all ${
                               isSelected
                                 ? 'bg-[#3B82F6]/15 border-[#3B82F6] text-[#3B82F6]'
                                 : 'bg-[#101016] border-white/5 text-[#92929F] hover:text-white'
@@ -3050,17 +3077,17 @@ export default function App() {
             </div>
 
             {/* STEP 3 */}
-            <div className="bg-[#15151D] border border-white/5 rounded-2xl p-4 sm:p-5 shadow-xl transition-all">
+            <div className="bg-[#15151D] border border-white/5 rounded-2xl p-4 sm:p-5 lg:p-6 shadow-xl transition-all w-full">
               <div
                 onClick={() => setCurrentStepOpen(currentStepOpen === 3 ? 0 : 3)}
                 className="flex items-center justify-between cursor-pointer"
               >
                 <div className="flex items-center gap-2.5">
-                  <div className="w-7 h-7 rounded-xl bg-[#EF4444]/15 text-[#EF4444] font-mono font-bold text-xs flex items-center justify-center border border-[#EF4444]/30">
+                  <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-xl bg-[#EF4444]/15 text-[#EF4444] font-mono font-bold text-xs sm:text-sm flex items-center justify-center border border-[#EF4444]/30">
                     3
                   </div>
                   <div>
-                    <h3 className="text-sm sm:text-base font-bold text-white font-mono flex items-center gap-2">
+                    <h3 className="text-sm sm:text-base lg:text-lg font-bold text-white font-mono flex items-center gap-2">
                       Step 3: Speed Bursts
                       {practiceSession.step3.isCompleted && (
                         <CheckCircle2 className="w-4 h-4 text-[#EF4444]" />
@@ -3070,7 +3097,7 @@ export default function App() {
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
-                  <span className="text-xs font-mono font-bold text-[#EF4444]">{practiceSession.step3.bpm} BPM</span>
+                  <span className="text-xs sm:text-sm font-mono font-bold text-[#EF4444]">{practiceSession.step3.bpm} BPM</span>
                   {currentStepOpen === 3 ? <ChevronUp className="w-4 h-4 text-[#92929F]" /> : <ChevronDown className="w-4 h-4 text-[#92929F]" />}
                 </div>
               </div>
@@ -3081,7 +3108,7 @@ export default function App() {
                     <div className="flex items-center gap-2">
                       <Clock className="w-4 h-4 text-[#EF4444]" />
                       <span className="text-xs text-[#92929F]">Timer:</span>
-                      <span className="font-mono font-bold text-sm text-white">
+                      <span className="font-mono font-bold text-sm sm:text-base text-white">
                         {Math.floor(practiceSession.step3.remainingSeconds / 60)}:
                         {String(practiceSession.step3.remainingSeconds % 60).padStart(2, '0')}
                       </span>
@@ -3092,7 +3119,7 @@ export default function App() {
                         <button
                           key={mins}
                           onClick={() => handleTimerDurationChange('step3', mins)}
-                          className={`px-2 py-1 rounded-lg text-[10px] font-mono font-bold border ${
+                          className={`px-2 sm:px-2.5 py-1 rounded-lg text-[10px] sm:text-xs font-mono font-bold border ${
                             practiceSession.step3.durationMinutes === mins
                               ? 'bg-[#EF4444]/20 border-[#EF4444] text-[#EF4444]'
                               : 'bg-[#1B1B25] border-white/5 text-[#92929F] hover:text-white'
@@ -3104,14 +3131,14 @@ export default function App() {
 
                       <button
                         onClick={() => toggleTimer('step3')}
-                        className="px-3 py-1 rounded-lg text-xs font-bold font-mono text-white ml-1"
+                        className="px-3 py-1 rounded-lg text-xs sm:text-sm font-bold font-mono text-white ml-1"
                         style={{ backgroundColor: practiceSession.step3.isTimerRunning ? '#F59E0B' : '#EF4444' }}
                       >
                         {practiceSession.step3.isTimerRunning ? 'Pause' : 'Start Timer'}
                       </button>
                       <button
                         onClick={() => resetTimer('step3')}
-                        className="p-1 rounded-lg bg-[#1B1B25] text-[#92929F] hover:text-white"
+                        className="p-1 sm:p-1.5 rounded-lg bg-[#1B1B25] text-[#92929F] hover:text-white"
                         title="Reset Timer"
                       >
                         <RotateCcw className="w-3.5 h-3.5" />
@@ -3122,7 +3149,7 @@ export default function App() {
                   <div className="bg-[#101016] p-3 rounded-xl border border-white/5 flex items-center justify-between flex-wrap gap-2">
                     <div className="flex items-center gap-2">
                       <Zap className="w-4 h-4 text-[#EF4444]" />
-                      <span className="text-xs text-white font-bold font-mono">Quick Speed Burst:</span>
+                      <span className="text-xs sm:text-sm text-white font-bold font-mono">Quick Speed Burst:</span>
                       {isBurstActive && (
                         <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-[#EF4444]/20 text-[#EF4444] animate-pulse">
                           BURST ACTIVE ({burstCountRemaining} beats left)
@@ -3133,13 +3160,13 @@ export default function App() {
                     <div className="flex items-center gap-2">
                       <button
                         onClick={() => triggerSpeedBurst(8)}
-                        className="px-3 py-1.5 rounded-xl bg-[#EF4444]/20 border border-[#EF4444]/40 text-[#EF4444] text-xs font-mono font-bold hover:bg-[#EF4444]/30 active:scale-95 transition-all"
+                        className="px-3 py-1.5 rounded-xl bg-[#EF4444]/20 border border-[#EF4444]/40 text-[#EF4444] text-xs sm:text-sm font-mono font-bold hover:bg-[#EF4444]/30 active:scale-95 transition-all"
                       >
                         ⚡ 8-Beat Sprint
                       </button>
                       <button
                         onClick={() => triggerSpeedBurst(16)}
-                        className="px-3 py-1.5 rounded-xl bg-[#EF4444]/20 border border-[#EF4444]/40 text-[#EF4444] text-xs font-mono font-bold hover:bg-[#EF4444]/30 active:scale-95 transition-all"
+                        className="px-3 py-1.5 rounded-xl bg-[#EF4444]/20 border border-[#EF4444]/40 text-[#EF4444] text-xs sm:text-sm font-mono font-bold hover:bg-[#EF4444]/30 active:scale-95 transition-all"
                       >
                         ⚡ 16-Beat Sprint
                       </button>
@@ -3147,15 +3174,15 @@ export default function App() {
                   </div>
 
                   <div>
-                    <label className="text-[10px] uppercase font-semibold text-[#92929F] mb-1.5 block">Focus Areas</label>
-                    <div className="flex flex-wrap gap-1.5">
+                    <label className="text-[10px] sm:text-xs uppercase font-semibold text-[#92929F] mb-1.5 block">Focus Areas</label>
+                    <div className="flex flex-wrap gap-1.5 sm:gap-2">
                       {INITIAL_FOCUS_STEP3.map(tag => {
                         const isSelected = practiceSession.step3.focusAreas.includes(tag);
                         return (
                           <button
                             key={tag}
                             onClick={() => toggleFocusArea('step3', tag)}
-                            className={`px-2.5 py-1 rounded-lg text-[11px] font-medium border transition-all ${
+                            className={`px-2.5 py-1 sm:py-1.5 rounded-lg text-[11px] sm:text-xs font-medium border transition-all ${
                               isSelected
                                 ? 'bg-[#EF4444]/15 border-[#EF4444] text-[#EF4444]'
                                 : 'bg-[#101016] border-white/5 text-[#92929F] hover:text-white'
@@ -3174,17 +3201,17 @@ export default function App() {
             </div>
 
             {/* STEP 4 */}
-            <div className="bg-[#15151D] border border-white/5 rounded-2xl p-4 sm:p-5 shadow-xl transition-all">
+            <div className="bg-[#15151D] border border-white/5 rounded-2xl p-4 sm:p-5 lg:p-6 shadow-xl transition-all w-full">
               <div
                 onClick={() => setCurrentStepOpen(currentStepOpen === 4 ? 0 : 4)}
                 className="flex items-center justify-between cursor-pointer"
               >
                 <div className="flex items-center gap-2.5">
-                  <div className="w-7 h-7 rounded-xl bg-[#A855F7]/15 text-[#A855F7] font-mono font-bold text-xs flex items-center justify-center border border-[#A855F7]/30">
+                  <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-xl bg-[#A855F7]/15 text-[#A855F7] font-mono font-bold text-xs sm:text-sm flex items-center justify-center border border-[#A855F7]/30">
                     4
                   </div>
                   <div>
-                    <h3 className="text-sm sm:text-base font-bold text-white font-mono flex items-center gap-2">
+                    <h3 className="text-sm sm:text-base lg:text-lg font-bold text-white font-mono flex items-center gap-2">
                       Step 4: Gamify & Log Progress
                       {practiceSession.step4.isCompleted && (
                         <CheckCircle2 className="w-4 h-4 text-[#A855F7]" />
@@ -3198,22 +3225,22 @@ export default function App() {
 
               {currentStepOpen === 4 && (
                 <div className="mt-4 pt-4 border-t border-white/5 space-y-4">
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 bg-[#101016] p-3 rounded-xl border border-white/5 text-center">
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 sm:gap-4 bg-[#101016] p-3 sm:p-4 rounded-xl border border-white/5 text-center">
                     <div>
-                      <span className="text-[9px] uppercase text-[#92929F]">Step 1 Comfort</span>
-                      <div className="text-sm font-bold font-mono text-[#10B981]">{practiceSession.step1.bpm} BPM</div>
+                      <span className="text-[9px] sm:text-[10px] uppercase text-[#92929F]">Step 1 Comfort</span>
+                      <div className="text-sm sm:text-base font-bold font-mono text-[#10B981]">{practiceSession.step1.bpm} BPM</div>
                     </div>
                     <div>
-                      <span className="text-[9px] uppercase text-[#92929F]">Step 2 Edge</span>
-                      <div className="text-sm font-bold font-mono text-[#3B82F6]">{practiceSession.step2.bpm} BPM</div>
+                      <span className="text-[9px] sm:text-[10px] uppercase text-[#92929F]">Step 2 Edge</span>
+                      <div className="text-sm sm:text-base font-bold font-mono text-[#3B82F6]">{practiceSession.step2.bpm} BPM</div>
                     </div>
                     <div>
-                      <span className="text-[9px] uppercase text-[#92929F]">Step 3 Burst</span>
-                      <div className="text-sm font-bold font-mono text-[#EF4444]">{practiceSession.step3.bpm} BPM</div>
+                      <span className="text-[9px] sm:text-[10px] uppercase text-[#92929F]">Step 3 Burst</span>
+                      <div className="text-sm sm:text-base font-bold font-mono text-[#EF4444]">{practiceSession.step3.bpm} BPM</div>
                     </div>
                     <div>
-                      <span className="text-[9px] uppercase text-[#92929F]">Exercise</span>
-                      <div className="text-xs font-bold font-mono truncate" style={{ color: currentTheme.primary }}>
+                      <span className="text-[9px] sm:text-[10px] uppercase text-[#92929F]">Exercise</span>
+                      <div className="text-xs sm:text-sm font-bold font-mono truncate" style={{ color: currentTheme.primary }}>
                         {practiceSession.selectedExerciseName || 'Routine'}
                       </div>
                     </div>
@@ -3222,7 +3249,7 @@ export default function App() {
                   <div className="flex items-center justify-end gap-2 pt-2">
                     <button
                       onClick={() => setIsLogModalOpen(true)}
-                      className="px-5 py-2.5 rounded-xl text-white font-bold text-xs flex items-center gap-2 transition-all active:scale-95 font-mono"
+                      className="px-5 sm:px-6 py-2.5 sm:py-3 rounded-xl text-white font-bold text-xs sm:text-sm flex items-center gap-2 transition-all active:scale-95 font-mono"
                       style={{
                         backgroundColor: currentTheme.primary,
                         boxShadow: `0 0 15px ${currentTheme.glow}`
@@ -3240,11 +3267,11 @@ export default function App() {
 
         {/* MODULE 2: METRONOME TAB */}
         {activeTab === 'metronome' && (
-          <div className="space-y-4 sm:space-y-6">
+          <div className="space-y-4 sm:space-y-6 w-full flex-1">
             <div className="flex items-center justify-between pb-1 flex-wrap gap-2">
               <div>
-                <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-white font-mono flex items-center gap-2">
-                  <Clock className="w-5 h-5" style={{ color: currentTheme.primary }} />
+                <h2 className="text-xl sm:text-2xl lg:text-3xl font-bold tracking-tight text-white font-mono flex items-center gap-2">
+                  <Clock className="w-5 h-5 lg:w-6 lg:h-6" style={{ color: currentTheme.primary }} />
                   Master Studio Metronome
                 </h2>
                 <p className="text-xs sm:text-sm text-[#92929F]">Zero-drift Web Audio lookahead engine &bull; Dynamic subdivision visualizer</p>
@@ -3262,7 +3289,7 @@ export default function App() {
                       setActiveMetronomeMode(m.id);
                       audioEngine.playUiSound('step');
                     }}
-                    className="px-3 py-1.5 rounded-lg text-xs font-semibold transition-all"
+                    className="px-3 sm:px-4 py-1.5 rounded-lg text-xs sm:text-sm font-semibold transition-all"
                     style={{
                       backgroundColor: activeMetronomeMode === m.id ? '#1B1B25' : 'transparent',
                       color: activeMetronomeMode === m.id ? currentTheme.primary : '#92929F',
@@ -3277,14 +3304,14 @@ export default function App() {
 
             {/* Standard Metronome */}
             {activeMetronomeMode === 'standard' && (
-              <div className="bg-[#15151D] border border-white/5 rounded-2xl p-4 sm:p-6 shadow-2xl relative overflow-hidden">
+              <div className="bg-[#15151D] border border-white/5 rounded-2xl p-4 sm:p-6 lg:p-8 shadow-2xl relative overflow-hidden w-full">
                 <div
-                  className="absolute -top-24 left-1/2 -translate-x-1/2 w-96 h-48 rounded-full pointer-events-none blur-3xl opacity-20"
+                  className="absolute -top-24 left-1/2 -translate-x-1/2 w-96 sm:w-[600px] h-48 rounded-full pointer-events-none blur-3xl opacity-20"
                   style={{ backgroundColor: currentTheme.primary }}
                 />
 
                 <div className="flex flex-col items-center justify-center pt-1 pb-1 relative z-10">
-                  <div className="text-7xl sm:text-9xl font-black font-gx-num tracking-tight text-white mb-0.5 sm:mb-1 leading-none select-none drop-shadow-[0_4px_16px_rgba(0,0,0,0.6)]">
+                  <div className="text-fluid-bpm font-black font-gx-num tracking-tight text-white mb-0.5 sm:mb-1 select-none drop-shadow-[0_4px_16px_rgba(0,0,0,0.6)]">
                     {bpm}
                   </div>
                   <div className="text-[10px] sm:text-xs uppercase tracking-widest text-[#92929F] font-bold font-gx-display mb-1">
@@ -3294,23 +3321,23 @@ export default function App() {
 
                 {renderDotVisualiser(selectedSubdivision, bpm)}
 
-                <div className="flex flex-col items-center justify-center pt-2 sm:pt-4 relative z-10">
-                  <div className="flex items-center gap-1.5 sm:gap-3 w-full max-w-sm justify-center">
+                <div className="flex flex-col items-center justify-center pt-2 sm:pt-4 relative z-10 w-full">
+                  <div className="flex items-center gap-1.5 sm:gap-3 w-full max-w-lg justify-center">
                     <button
                       onClick={() => { const val = Math.max(30, bpm - 5); setBpm(val); audioEngine.setBpm(val); audioEngine.playUiSound('step'); }}
-                      className="flex-1 sm:flex-none px-2 sm:px-3.5 py-2 rounded-xl bg-[#1B1B25] border border-white/5 text-xs sm:text-sm font-bold font-gx-num text-white hover:bg-[#252533] hover:border-white/10 active:scale-95 transition-all"
+                      className="flex-1 sm:flex-none px-2 sm:px-4 py-2 sm:py-2.5 rounded-xl bg-[#1B1B25] border border-white/5 text-xs sm:text-sm font-bold font-gx-num text-white hover:bg-[#252533] hover:border-white/10 active:scale-95 transition-all"
                     >
                       -5
                     </button>
                     <button
                       onClick={() => { const val = Math.max(30, bpm - 1); setBpm(val); audioEngine.setBpm(val); audioEngine.playUiSound('step'); }}
-                      className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-[#1B1B25] border border-white/5 text-xs sm:text-sm font-bold font-gx-num text-white flex items-center justify-center hover:bg-[#252533] hover:border-white/10 active:scale-95 transition-all"
+                      className="w-9 h-9 sm:w-11 sm:h-11 rounded-xl bg-[#1B1B25] border border-white/5 text-xs sm:text-sm font-bold font-gx-num text-white flex items-center justify-center hover:bg-[#252533] hover:border-white/10 active:scale-95 transition-all"
                     >
                       -1
                     </button>
                     <button
                       onClick={() => togglePlay(bpm, selectedSubdivision)}
-                      className="flex-[2] sm:flex-none px-4 sm:px-8 py-2.5 sm:py-3.5 rounded-2xl text-xs sm:text-sm font-extrabold font-gx-display flex items-center justify-center gap-1.5 sm:gap-2 transition-all active:scale-95"
+                      className="flex-[2] sm:flex-none px-5 sm:px-10 py-2.5 sm:py-3.5 rounded-2xl text-xs sm:text-sm lg:text-base font-extrabold font-gx-display flex items-center justify-center gap-1.5 sm:gap-2 transition-all active:scale-95"
                       style={{
                         backgroundColor: isPlaying ? '#EF4444' : currentTheme.primary,
                         color: '#FFFFFF',
@@ -3322,19 +3349,19 @@ export default function App() {
                     </button>
                     <button
                       onClick={() => { const val = Math.min(320, bpm + 1); setBpm(val); audioEngine.setBpm(val); audioEngine.playUiSound('step'); }}
-                      className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-[#1B1B25] border border-white/5 text-xs sm:text-sm font-bold font-gx-num text-white flex items-center justify-center hover:bg-[#252533] hover:border-white/10 active:scale-95 transition-all"
+                      className="w-9 h-9 sm:w-11 sm:h-11 rounded-xl bg-[#1B1B25] border border-white/5 text-xs sm:text-sm font-bold font-gx-num text-white flex items-center justify-center hover:bg-[#252533] hover:border-white/10 active:scale-95 transition-all"
                     >
                       +1
                     </button>
                     <button
                       onClick={() => { const val = Math.min(320, bpm + 5); setBpm(val); audioEngine.setBpm(val); audioEngine.playUiSound('step'); }}
-                      className="flex-1 sm:flex-none px-2 sm:px-3.5 py-2 rounded-xl bg-[#1B1B25] border border-white/5 text-xs sm:text-sm font-bold font-gx-num text-white hover:bg-[#252533] hover:border-white/10 active:scale-95 transition-all"
+                      className="flex-1 sm:flex-none px-2 sm:px-4 py-2 sm:py-2.5 rounded-xl bg-[#1B1B25] border border-white/5 text-xs sm:text-sm font-bold font-gx-num text-white hover:bg-[#252533] hover:border-white/10 active:scale-95 transition-all"
                     >
                       +5
                     </button>
                   </div>
 
-                  <div className="flex items-center justify-center gap-1.5 mt-3 flex-wrap">
+                  <div className="flex items-center justify-center gap-1.5 sm:gap-2 mt-3 flex-wrap">
                     {[60, 80, 100, 120, 140, 160].map(preset => (
                       <button
                         key={preset}
@@ -3343,7 +3370,7 @@ export default function App() {
                           audioEngine.setBpm(preset);
                           audioEngine.playUiSound('step');
                         }}
-                        className={`px-2.5 py-1 rounded-lg text-xs font-gx-num font-bold border transition-all ${
+                        className={`px-3 py-1 sm:py-1.5 rounded-lg text-xs sm:text-sm font-gx-num font-bold border transition-all ${
                           bpm === preset
                             ? 'text-white border-transparent'
                             : 'bg-[#101016] text-[#92929F] border-white/5 hover:border-white/15'
@@ -3358,7 +3385,7 @@ export default function App() {
                     ))}
                   </div>
 
-                  <div className="w-full max-w-md mt-4 sm:mt-5 space-y-3 sm:space-y-4">
+                  <div className="w-full max-w-xl mt-4 sm:mt-6 space-y-3 sm:space-y-4">
                     <input
                       type="range"
                       min="30"
@@ -3411,14 +3438,14 @@ export default function App() {
                             audioEngine.setVolume(val);
                           }}
                           style={{ accentColor: currentTheme.primary }}
-                          className="w-16 sm:w-20 h-1.5 bg-[#1B1B25] rounded-lg cursor-pointer"
+                          className="w-20 sm:w-24 h-1.5 bg-[#1B1B25] rounded-lg cursor-pointer"
                         />
                       </div>
                     </div>
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-5 sm:mt-6 pt-4 sm:pt-5 border-t border-white/5 relative z-10">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-5 sm:mt-6 pt-4 sm:pt-5 border-t border-white/5 relative z-10 w-full">
                   <div>
                     <label className="text-[10px] sm:text-xs uppercase font-semibold text-[#92929F] mb-2 block font-gx-display">Rhythmic Subdivision</label>
                     <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5 sm:gap-2">
@@ -3480,9 +3507,9 @@ export default function App() {
 
             {/* Speed Training */}
             {activeMetronomeMode === 'speed' && (
-              <div className="bg-[#15151D] border border-white/5 rounded-2xl p-4 sm:p-6 shadow-2xl space-y-4">
+              <div className="bg-[#15151D] border border-white/5 rounded-2xl p-4 sm:p-6 lg:p-8 shadow-2xl space-y-4 w-full">
                 <div className="flex flex-col items-center justify-center pt-1 pb-1">
-                  <div className="text-7xl sm:text-9xl font-black font-gx-num tracking-tight text-white leading-none">
+                  <div className="text-fluid-bpm font-black font-gx-num tracking-tight text-white leading-none">
                     {speedProgress.isActive ? speedProgress.currentBpm : speedConfig.startBpm}
                   </div>
                   <div className="text-[10px] sm:text-xs uppercase tracking-widest text-[#92929F] font-bold font-gx-display mt-1">
@@ -3496,7 +3523,7 @@ export default function App() {
                   speedConfig.timeSignature.beats
                 )}
 
-                <div className="bg-[#101016] p-3 rounded-xl border border-white/5 flex items-center justify-between flex-wrap gap-2 text-xs">
+                <div className="bg-[#101016] p-3 rounded-xl border border-white/5 flex items-center justify-between flex-wrap gap-2 text-xs sm:text-sm">
                   <div className="text-[#92929F] flex items-center gap-2 font-gx-num">
                     <span>Target: <strong className="text-white font-bold">{speedConfig.endBpm}</strong></span>
                     &bull;
@@ -3507,7 +3534,7 @@ export default function App() {
 
                   <div className="flex items-center gap-2">
                     <span
-                      className="text-[10px] px-2.5 py-0.5 rounded-full font-bold uppercase tracking-wider border font-gx-code"
+                      className="text-[10px] sm:text-xs px-2.5 py-0.5 rounded-full font-bold uppercase tracking-wider border font-gx-code"
                       style={{
                         backgroundColor: speedProgress.stage === 'playing' ? 'rgba(16,185,129,0.15)' : currentTheme.accentBg,
                         borderColor: speedProgress.stage === 'playing' ? '#10B981' : currentTheme.primary,
@@ -3517,7 +3544,7 @@ export default function App() {
                       {speedProgress.stage}
                     </span>
                     {speedProgress.countInRemaining > 0 && (
-                      <span className="text-[11px] font-mono font-bold" style={{ color: currentTheme.primary }}>
+                      <span className="text-[11px] sm:text-xs font-mono font-bold" style={{ color: currentTheme.primary }}>
                         C-In: {speedProgress.countInRemaining}
                       </span>
                     )}
@@ -3528,7 +3555,7 @@ export default function App() {
                   {!speedProgress.isActive ? (
                     <button
                       onClick={startSpeedTraining}
-                      className="px-6 py-2.5 rounded-2xl text-white font-extrabold text-xs flex items-center gap-1.5 transition-all active:scale-95 font-gx-display"
+                      className="px-6 py-2.5 sm:py-3 rounded-2xl text-white font-extrabold text-xs sm:text-sm flex items-center gap-1.5 transition-all active:scale-95 font-gx-display"
                       style={{
                         backgroundColor: currentTheme.primary,
                         boxShadow: `0 0 15px ${currentTheme.glow}`
@@ -3540,7 +3567,7 @@ export default function App() {
                   ) : speedProgress.isPaused ? (
                     <button
                       onClick={resumeSpeedTraining}
-                      className="px-6 py-2.5 rounded-2xl bg-[#10B981] text-white font-extrabold text-xs flex items-center gap-1.5 hover:brightness-110 active:scale-95 font-gx-display"
+                      className="px-6 py-2.5 sm:py-3 rounded-2xl bg-[#10B981] text-white font-extrabold text-xs sm:text-sm flex items-center gap-1.5 hover:brightness-110 active:scale-95 font-gx-display"
                     >
                       <Play className="w-4 h-4 fill-current" />
                       RESUME
@@ -3548,7 +3575,7 @@ export default function App() {
                   ) : (
                     <button
                       onClick={pauseSpeedTraining}
-                      className="px-6 py-2.5 rounded-2xl bg-[#3B82F6] text-white font-extrabold text-xs flex items-center gap-1.5 hover:brightness-110 active:scale-95 font-gx-display"
+                      className="px-6 py-2.5 sm:py-3 rounded-2xl bg-[#3B82F6] text-white font-extrabold text-xs sm:text-sm flex items-center gap-1.5 hover:brightness-110 active:scale-95 font-gx-display"
                     >
                       <Pause className="w-4 h-4 fill-current" />
                       PAUSE
@@ -3558,7 +3585,7 @@ export default function App() {
                   {speedProgress.isActive && (
                     <button
                       onClick={stopSpeedTraining}
-                      className="px-4 py-2.5 rounded-2xl bg-[#EF4444] text-white font-bold text-xs flex items-center gap-1 hover:brightness-110 active:scale-95 font-gx-display"
+                      className="px-4 py-2.5 sm:py-3 rounded-2xl bg-[#EF4444] text-white font-bold text-xs sm:text-sm flex items-center gap-1 hover:brightness-110 active:scale-95 font-gx-display"
                     >
                       <Square className="w-3.5 h-3.5 fill-current" />
                       STOP
@@ -3567,114 +3594,20 @@ export default function App() {
 
                   <button
                     onClick={startSpeedTraining}
-                    className="px-4 py-2.5 rounded-2xl bg-[#1B1B25] border border-white/5 text-white font-semibold text-xs flex items-center gap-1 hover:bg-[#252533] active:scale-95 font-gx-display"
+                    className="px-4 py-2.5 sm:py-3 rounded-2xl bg-[#1B1B25] border border-white/5 text-white font-semibold text-xs sm:text-sm flex items-center gap-1 hover:bg-[#252533] active:scale-95 font-gx-display"
                   >
                     <RotateCcw className="w-3.5 h-3.5" />
                     RESTART
                   </button>
-                </div>
-
-                <div className="pt-4 border-t border-white/5 space-y-4">
-                  <div className="flex items-center justify-between flex-wrap gap-2 pb-2 border-b border-white/5">
-                    <div>
-                      <h3 className="text-sm sm:text-base font-bold text-white font-gx-display">Speed Training Parameters</h3>
-                      <p className="text-[11px] sm:text-xs text-[#92929F]">Configure automated tempo increases and loop repetitions.</p>
-                    </div>
-
-                    <div className="flex items-center gap-2 bg-[#101016] px-3 py-1.5 rounded-xl border border-white/5">
-                      <span className="text-[10px] sm:text-xs font-semibold text-[#92929F] uppercase">Count In:</span>
-                      <button
-                        onClick={() => setSpeedConfig(prev => ({ ...prev, countInEnabled: !prev.countInEnabled }))}
-                        className="px-2.5 py-0.5 rounded text-xs font-bold transition-all"
-                        style={{
-                          backgroundColor: speedConfig.countInEnabled ? currentTheme.primary : '#1B1B25',
-                          color: speedConfig.countInEnabled ? '#FFFFFF' : '#92929F'
-                        }}
-                      >
-                        {speedConfig.countInEnabled ? 'ON' : 'OFF'}
-                      </button>
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="text-[10px] sm:text-xs uppercase font-semibold text-[#92929F] mb-1.5 block">Time Signature</label>
-                    <div className="flex gap-1.5 flex-wrap">
-                      {TIME_SIGNATURES.map(ts => {
-                        const isSel = speedConfig.timeSignature.id === ts.id;
-                        return (
-                          <button
-                            key={ts.id}
-                            onClick={() => {
-                              setSpeedConfig({ ...speedConfig, timeSignature: ts });
-                              if (!speedProgress.isActive) audioEngine.setTimeSignature(ts);
-                            }}
-                            className="px-3 py-1 rounded-full text-xs font-bold border transition-all font-mono"
-                            style={{
-                              backgroundColor: isSel ? currentTheme.primary : '#101016',
-                              color: isSel ? '#FFFFFF' : '#92929F',
-                              borderColor: isSel ? currentTheme.primary : 'rgba(255,255,255,0.08)',
-                              boxShadow: isSel ? `0 0 10px ${currentTheme.glow}` : 'none'
-                            }}
-                          >
-                            {ts.label}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-2.5">
-                    {[
-                      { label: 'Start BPM', key: 'startBpm', min: 40, max: 260 },
-                      { label: 'End BPM', key: 'endBpm', min: 50, max: 300 },
-                      { label: 'BPM Increment', key: 'bpmIncrement', min: 1, max: 20 },
-                      { label: 'Bars / Loop', key: 'barsPerLoop', min: 1, max: 16 },
-                      { label: 'Loops / Increase', key: 'loopsBeforeIncrease', min: 1, max: 8 },
-                      { label: 'Initial Count-In', key: 'initialCountIn', min: 1, max: 8 },
-                      { label: 'Speed Inc Count-In', key: 'speedIncreaseCountIn', min: 1, max: 8 },
-                    ].map(item => (
-                      <div key={item.key} className="bg-[#101016] p-2.5 sm:p-3 rounded-xl border border-white/5">
-                        <div className="flex items-center justify-between mb-1.5">
-                          <span className="text-[11px] font-semibold text-[#92929F] truncate pr-1">{item.label}</span>
-                          <span className="font-mono text-xs font-bold" style={{ color: currentTheme.primary }}>
-                            {speedConfig[item.key]}
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-1.5">
-                          <button
-                            onClick={() => setSpeedConfig({ ...speedConfig, [item.key]: Math.max(item.min, speedConfig[item.key] - 1) })}
-                            className="w-7 h-7 rounded-lg bg-[#1B1B25] border border-white/5 text-xs font-bold text-white flex items-center justify-center hover:bg-[#252533] active:scale-95"
-                          >
-                            -
-                          </button>
-                          <input
-                            type="range"
-                            min={item.min}
-                            max={item.max}
-                            value={speedConfig[item.key]}
-                            onChange={(e) => setSpeedConfig({ ...speedConfig, [item.key]: Number(e.target.value) })}
-                            style={{ accentColor: currentTheme.primary }}
-                            className="flex-1 h-1.5 bg-[#1B1B25] rounded cursor-pointer"
-                          />
-                          <button
-                            onClick={() => setSpeedConfig({ ...speedConfig, [item.key]: Math.min(item.max, speedConfig[item.key] + 1) })}
-                            className="w-7 h-7 rounded-lg bg-[#1B1B25] border border-white/5 text-xs font-bold text-white flex items-center justify-center hover:bg-[#252533] active:scale-95"
-                          >
-                            +
-                          </button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
                 </div>
               </div>
             )}
 
             {/* Ratios Training */}
             {activeMetronomeMode === 'ratios' && (
-              <div className="bg-[#15151D] border border-white/5 rounded-2xl p-4 sm:p-6 shadow-2xl space-y-4">
+              <div className="bg-[#15151D] border border-white/5 rounded-2xl p-4 sm:p-6 lg:p-8 shadow-2xl space-y-4 w-full">
                 <div className="flex flex-col items-center justify-center pt-1 pb-1">
-                  <div className="text-7xl sm:text-9xl font-black font-gx-num tracking-tight text-white leading-none">
+                  <div className="text-fluid-bpm font-black font-gx-num tracking-tight text-white leading-none">
                     {ratiosConfig.bpm}
                   </div>
                   <div className="text-[10px] sm:text-xs uppercase tracking-widest text-[#92929F] font-bold font-gx-display mt-1">
@@ -3688,15 +3621,15 @@ export default function App() {
                   ratiosConfig.numberOfBeats
                 )}
 
-                <div className="bg-[#101016] p-3 rounded-xl border border-white/5 flex items-center justify-between flex-wrap gap-2 text-xs">
+                <div className="bg-[#101016] p-3 rounded-xl border border-white/5 flex items-center justify-between flex-wrap gap-2 text-xs sm:text-sm">
                   <div>
-                    <div className="font-gx-display text-white flex items-center gap-1.5 font-bold text-xs">
+                    <div className="font-gx-display text-white flex items-center gap-1.5 font-bold text-xs sm:text-sm">
                       Loop {ratiosProgress.activeLoop}:
                       <span style={{ color: currentTheme.primary }}>
                         {ratiosProgress.currentSubdivision.name}
                       </span>
                     </div>
-                    <div className="text-[10px] text-[#92929F] font-gx-num">
+                    <div className="text-[10px] sm:text-xs text-[#92929F] font-gx-num">
                       Beat {ratiosProgress.currentBeat} of {ratiosConfig.numberOfBeats}
                     </div>
                   </div>
@@ -3706,7 +3639,7 @@ export default function App() {
                   {!ratiosProgress.isActive ? (
                     <button
                       onClick={startRatiosTraining}
-                      className="px-6 py-2.5 rounded-2xl text-white font-extrabold text-xs flex items-center gap-1.5 transition-all active:scale-95 font-gx-display"
+                      className="px-6 py-2.5 sm:py-3 rounded-2xl text-white font-extrabold text-xs sm:text-sm flex items-center gap-1.5 transition-all active:scale-95 font-gx-display"
                       style={{
                         backgroundColor: currentTheme.primary,
                         boxShadow: `0 0 15px ${currentTheme.glow}`
@@ -3718,119 +3651,12 @@ export default function App() {
                   ) : (
                     <button
                       onClick={stopRatiosTraining}
-                      className="px-6 py-2.5 rounded-2xl bg-[#EF4444] text-white font-extrabold text-xs flex items-center gap-1.5 active:scale-95 font-gx-display"
+                      className="px-6 py-2.5 sm:py-3 rounded-2xl bg-[#EF4444] text-white font-extrabold text-xs sm:text-sm flex items-center gap-1.5 active:scale-95 font-gx-display"
                     >
                       <Square className="w-4 h-4 fill-current" />
                       STOP
                     </button>
                   )}
-                </div>
-
-                <div className="pt-4 border-t border-white/5 space-y-4">
-                  <div className="flex items-center justify-between flex-wrap gap-2 pb-2 border-b border-white/5">
-                    <div>
-                      <h3 className="text-sm sm:text-base font-bold text-white font-gx-display">Ratios Configuration</h3>
-                      <p className="text-[11px] sm:text-xs text-[#92929F]">Switch subdivisions between loops to master rhythmic polyrhythms.</p>
-                    </div>
-
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <div className="flex items-center gap-1.5 bg-[#101016] px-2.5 py-1 rounded-xl border border-white/5">
-                        <span className="text-[10px] font-semibold text-[#92929F] uppercase">Count In:</span>
-                        <button
-                          onClick={() => setRatiosConfig(prev => ({ ...prev, countInEnabled: !prev.countInEnabled }))}
-                          className="px-2.5 py-0.5 rounded text-[11px] font-bold"
-                          style={{
-                            backgroundColor: ratiosConfig.countInEnabled ? currentTheme.primary : '#1B1B25',
-                            color: ratiosConfig.countInEnabled ? '#FFFFFF' : '#92929F'
-                          }}
-                        >
-                          {ratiosConfig.countInEnabled ? 'ON' : 'OFF'}
-                        </button>
-                      </div>
-
-                      <div className="flex items-center gap-1.5 bg-[#101016] px-2.5 py-1 rounded-xl border border-white/5">
-                        <span className="text-[10px] font-semibold text-[#92929F] uppercase">Ratio:</span>
-                        <button
-                          onClick={() => setRatiosConfig(prev => ({ ...prev, subdivisionRatioEnabled: !prev.subdivisionRatioEnabled }))}
-                          className="px-2.5 py-0.5 rounded text-[11px] font-bold"
-                          style={{
-                            backgroundColor: ratiosConfig.subdivisionRatioEnabled ? currentTheme.primary : '#1B1B25',
-                            color: ratiosConfig.subdivisionRatioEnabled ? '#FFFFFF' : '#92929F'
-                          }}
-                        >
-                          {ratiosConfig.subdivisionRatioEnabled ? 'ON' : 'OFF'}
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
-                    {[
-                      { label: 'BPM', key: 'bpm', min: 40, max: 260 },
-                      { label: 'Beats / Loop', key: 'numberOfBeats', min: 1, max: 12 },
-                      { label: 'Init Count-In', key: 'initialCountIn', min: 1, max: 8 },
-                      { label: 'Repeat Count-In', key: 'repeatCountIn', min: 1, max: 8 },
-                    ].map(item => (
-                      <div key={item.key} className="bg-[#101016] p-2.5 sm:p-3 rounded-xl border border-white/5">
-                        <div className="flex items-center justify-between mb-1.5">
-                          <span className="text-[10px] sm:text-xs font-semibold text-[#92929F] truncate pr-1">{item.label}</span>
-                          <span className="font-mono text-xs font-bold" style={{ color: currentTheme.primary }}>
-                            {ratiosConfig[item.key]}
-                          </span>
-                        </div>
-                        <input
-                          type="range"
-                          min={item.min}
-                          max={item.max}
-                          value={ratiosConfig[item.key]}
-                          onChange={(e) => {
-                            const val = Number(e.target.value);
-                            setRatiosConfig({ ...ratiosConfig, [item.key]: val });
-                            if (item.key === 'bpm' && ratiosProgress.isActive) audioEngine.setBpm(val);
-                          }}
-                          style={{ accentColor: currentTheme.primary }}
-                          className="w-full h-1.5 bg-[#1B1B25] rounded cursor-pointer"
-                        />
-                      </div>
-                    ))}
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <div className="bg-[#101016] p-3 rounded-xl border border-white/5">
-                      <label className="text-[10px] font-semibold text-[#92929F] uppercase block mb-1.5">Loop 1 Subdivision</label>
-                      <select
-                        value={ratiosConfig.loop1.id}
-                        onChange={(e) => {
-                          const found = SUBDIVISIONS.find(s => s.id === e.target.value) || SUBDIVISIONS[1];
-                          setRatiosConfig({ ...ratiosConfig, loop1: found });
-                          if (ratiosProgress.isActive && ratiosProgress.activeLoop === 1) {
-                            audioEngine.setSubdivision(found);
-                          }
-                        }}
-                        className="w-full bg-[#1B1B25] border border-white/10 rounded-xl px-2.5 py-2 text-xs text-white"
-                      >
-                        {SUBDIVISIONS.map(s => <option key={s.id} value={s.id}>{s.name} ({s.dotsPerBeat})</option>)}
-                      </select>
-                    </div>
-
-                    <div className="bg-[#101016] p-3 rounded-xl border border-white/5">
-                      <label className="text-[10px] font-semibold text-[#92929F] uppercase block mb-1.5">Loop 2 Subdivision</label>
-                      <select
-                        disabled={!ratiosConfig.subdivisionRatioEnabled}
-                        value={ratiosConfig.loop2.id}
-                        onChange={(e) => {
-                          const found = SUBDIVISIONS.find(s => s.id === e.target.value) || SUBDIVISIONS[3];
-                          setRatiosConfig({ ...ratiosConfig, loop2: found });
-                          if (ratiosProgress.isActive && ratiosProgress.activeLoop === 2) {
-                            audioEngine.setSubdivision(found);
-                          }
-                        }}
-                        className="w-full bg-[#1B1B25] border border-white/10 rounded-xl px-2.5 py-2 text-xs text-white disabled:opacity-40"
-                      >
-                        {SUBDIVISIONS.map(s => <option key={s.id} value={s.id}>{s.name} ({s.dotsPerBeat})</option>)}
-                      </select>
-                    </div>
-                  </div>
                 </div>
               </div>
             )}
@@ -3839,57 +3665,57 @@ export default function App() {
 
         {/* MODULE 3: MY PROGRESS */}
         {activeTab === 'progress' && (
-          <div className="space-y-4 sm:space-y-6">
+          <div className="space-y-4 sm:space-y-6 w-full flex-1">
             <div>
-              <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-white font-mono flex items-center gap-2">
-                <BarChart2 className="w-5 h-5" style={{ color: currentTheme.primary }} />
+              <h2 className="text-xl sm:text-2xl lg:text-3xl font-bold tracking-tight text-white font-mono flex items-center gap-2">
+                <BarChart2 className="w-5 h-5 lg:w-6 lg:h-6" style={{ color: currentTheme.primary }} />
                 My Guitar Progress & Analytics
               </h2>
               <p className="text-xs sm:text-sm text-[#92929F]">Velocity tracking, speed benchmarks & technique distribution.</p>
             </div>
 
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-              <div className="bg-[#15151D] border border-white/5 p-4 rounded-2xl shadow-lg">
-                <span className="text-[10px] text-[#92929F] uppercase font-semibold">Total Practice Time</span>
-                <div className="text-xl sm:text-2xl font-bold font-mono text-white mt-1">
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 lg:gap-5 w-full">
+              <div className="bg-[#15151D] border border-white/5 p-4 lg:p-5 rounded-2xl shadow-lg">
+                <span className="text-[10px] sm:text-xs text-[#92929F] uppercase font-semibold">Total Practice Time</span>
+                <div className="text-xl sm:text-2xl lg:text-3xl font-bold font-mono text-white mt-1">
                   {historySessions.reduce((acc, s) => acc + (s.totalDurationMinutes || 0), 0)} <span className="text-xs text-[#92929F]">mins</span>
                 </div>
                 <div className="text-[10px] text-[#10B981] mt-0.5">Logged across {historySessions.length} routines</div>
               </div>
 
-              <div className="bg-[#15151D] border border-white/5 p-4 rounded-2xl shadow-lg">
-                <span className="text-[10px] text-[#92929F] uppercase font-semibold">Peak Clean Edge</span>
-                <div className="text-xl sm:text-2xl font-bold font-mono mt-1" style={{ color: currentTheme.primary }}>
+              <div className="bg-[#15151D] border border-white/5 p-4 lg:p-5 rounded-2xl shadow-lg">
+                <span className="text-[10px] sm:text-xs text-[#92929F] uppercase font-semibold">Peak Clean Edge</span>
+                <div className="text-xl sm:text-2xl lg:text-3xl font-bold font-mono mt-1" style={{ color: currentTheme.primary }}>
                   {Math.max(...historySessions.map(s => s.edgeBpm || 0), 110)} <span className="text-xs text-[#92929F]">BPM</span>
                 </div>
                 <div className="text-[10px] text-[#92929F] mt-0.5">Highest verified clean tempo</div>
               </div>
 
-              <div className="bg-[#15151D] border border-white/5 p-4 rounded-2xl shadow-lg">
-                <span className="text-[10px] text-[#92929F] uppercase font-semibold">Active Streak</span>
-                <div className="text-xl sm:text-2xl font-bold font-mono text-[#F59E0B] mt-1 flex items-center gap-1">
-                  <Flame className="w-5 h-5" />
+              <div className="bg-[#15151D] border border-white/5 p-4 lg:p-5 rounded-2xl shadow-lg">
+                <span className="text-[10px] sm:text-xs text-[#92929F] uppercase font-semibold">Active Streak</span>
+                <div className="text-xl sm:text-2xl lg:text-3xl font-bold font-mono text-[#F59E0B] mt-1 flex items-center gap-1">
+                  <Flame className="w-5 h-5 lg:w-6 lg:h-6" />
                   {practicedCalendarDays.length} <span className="text-xs text-[#92929F]">Days</span>
                 </div>
                 <div className="text-[10px] text-[#92929F] mt-0.5">Consistent training days</div>
               </div>
 
-              <div className="bg-[#15151D] border border-white/5 p-4 rounded-2xl shadow-lg">
-                <span className="text-[10px] text-[#92929F] uppercase font-semibold">Exercises in Armory</span>
-                <div className="text-xl sm:text-2xl font-bold font-mono text-[#3B82F6] mt-1">
+              <div className="bg-[#15151D] border border-white/5 p-4 lg:p-5 rounded-2xl shadow-lg">
+                <span className="text-[10px] sm:text-xs text-[#92929F] uppercase font-semibold">Exercises in Armory</span>
+                <div className="text-xl sm:text-2xl lg:text-3xl font-bold font-mono text-[#3B82F6] mt-1">
                   {exercises.length} <span className="text-xs text-[#92929F]">Active</span>
                 </div>
                 <div className="text-[10px] text-[#92929F] mt-0.5">Ready for daily cycles</div>
               </div>
             </div>
 
-            <div className="bg-[#15151D] border border-white/5 p-4 sm:p-6 rounded-2xl shadow-xl space-y-3">
-              <h3 className="text-sm sm:text-base font-bold text-white font-mono flex items-center gap-2">
-                <Target className="w-4 h-4" style={{ color: currentTheme.primary }} />
+            <div className="bg-[#15151D] border border-white/5 p-4 sm:p-6 rounded-2xl shadow-xl space-y-3 w-full">
+              <h3 className="text-sm sm:text-base lg:text-lg font-bold text-white font-mono flex items-center gap-2">
+                <Target className="w-4 h-4 lg:w-5 lg:h-5" style={{ color: currentTheme.primary }} />
                 Target BPM Completion Gauges
               </h3>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-1">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 pt-1">
                 {exercises.map(ex => {
                   const range = (ex.targetBpm - ex.startBpm) || 1;
                   const current = (ex.currentBpm - ex.startBpm);
@@ -3899,10 +3725,10 @@ export default function App() {
                     <div
                       key={ex.id}
                       onClick={() => setInspectedExerciseProgress(ex)}
-                      className="bg-[#101016] border border-white/5 hover:border-white/15 p-3 rounded-xl transition-all cursor-pointer group"
+                      className="bg-[#101016] border border-white/5 hover:border-white/15 p-3 sm:p-4 rounded-xl transition-all cursor-pointer group"
                     >
                       <div className="flex items-center justify-between text-xs mb-1.5">
-                        <span className="font-bold text-white group-hover:text-white transition-colors truncate max-w-[200px]">
+                        <span className="font-bold text-white group-hover:text-white transition-colors truncate max-w-[180px]">
                           {ex.name}
                         </span>
                         <span className="font-mono font-bold" style={{ color: currentTheme.primary }}>{pct}%</span>
@@ -3925,11 +3751,11 @@ export default function App() {
             </div>
 
             {/* Practice Calendar */}
-            <div className="bg-[#15151D] border border-white/5 p-4 sm:p-6 rounded-2xl shadow-xl">
+            <div className="bg-[#15151D] border border-white/5 p-4 sm:p-6 rounded-2xl shadow-xl w-full">
               <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
                 <div>
-                  <h3 className="text-sm sm:text-base font-bold text-white font-mono flex items-center gap-2">
-                    <Calendar className="w-4 h-4" style={{ color: currentTheme.primary }} />
+                  <h3 className="text-sm sm:text-base lg:text-lg font-bold text-white font-mono flex items-center gap-2">
+                    <Calendar className="w-4 h-4 lg:w-5 lg:h-5" style={{ color: currentTheme.primary }} />
                     Practice Consistency Calendar
                   </h3>
                   <span className="text-xs text-[#92929F] font-mono">Click any date to toggle completion status</span>
@@ -3962,13 +3788,13 @@ export default function App() {
                 const monthPrefix = `${year}-${String(month + 1).padStart(2, '0')}`;
 
                 return (
-                  <div className="grid grid-cols-7 gap-1.5 text-center text-xs font-mono">
+                  <div className="grid grid-cols-7 gap-1.5 sm:gap-2.5 text-center text-xs sm:text-sm font-mono w-full">
                     {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(d => (
-                      <div key={d} className="text-[#92929F] py-1 font-bold text-[10px] uppercase">{d}</div>
+                      <div key={d} className="text-[#92929F] py-1 font-bold text-[10px] sm:text-xs uppercase">{d}</div>
                     ))}
 
                     {Array.from({ length: firstDayIndex }).map((_, i) => (
-                      <div key={`empty-${i}`} className="h-9 rounded-xl" />
+                      <div key={`empty-${i}`} className="h-9 sm:h-11 rounded-xl" />
                     ))}
 
                     {Array.from({ length: totalDaysInMonth }).map((_, i) => {
@@ -3980,7 +3806,7 @@ export default function App() {
                         <button
                           key={dateStr}
                           onClick={() => toggleCalendarDate(dateStr)}
-                          className={`h-9 rounded-xl flex items-center justify-center font-bold text-xs transition-all ${
+                          className={`h-9 sm:h-11 rounded-xl flex items-center justify-center font-bold text-xs sm:text-sm transition-all ${
                             isPracticed
                               ? 'text-white border'
                               : 'bg-[#101016] text-[#92929F] border border-white/5 hover:border-white/10'
@@ -4004,11 +3830,11 @@ export default function App() {
 
         {/* MODULE 4: EXERCISE LIBRARY */}
         {activeTab === 'library' && (
-          <div className="space-y-4 sm:space-y-6">
+          <div className="space-y-4 sm:space-y-6 w-full flex-1">
             <div className="flex items-center justify-between pb-1 flex-wrap gap-2">
               <div>
-                <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-white font-mono flex items-center gap-2">
-                  <BookOpen className="w-5 h-5" style={{ color: currentTheme.primary }} />
+                <h2 className="text-xl sm:text-2xl lg:text-3xl font-bold tracking-tight text-white font-mono flex items-center gap-2">
+                  <BookOpen className="w-5 h-5 lg:w-6 lg:h-6" style={{ color: currentTheme.primary }} />
                   Exercise Armory
                 </h2>
                 <p className="text-xs sm:text-sm text-[#92929F]">Manage and deploy your technical practice catalogue.</p>
@@ -4016,7 +3842,7 @@ export default function App() {
 
               <button
                 onClick={() => setIsAddExerciseModalOpen(true)}
-                className="px-4 py-2 rounded-xl text-white font-extrabold text-xs flex items-center gap-1.5 transition-all active:scale-95 font-mono"
+                className="px-4 py-2 sm:py-2.5 rounded-xl text-white font-extrabold text-xs sm:text-sm flex items-center gap-1.5 transition-all active:scale-95 font-mono"
                 style={{
                   backgroundColor: currentTheme.primary,
                   boxShadow: `0 0 15px ${currentTheme.glow}`
@@ -4027,17 +3853,17 @@ export default function App() {
               </button>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4 w-full">
               {exercises.map(ex => (
                 <div
                   key={ex.id}
-                  className="bg-[#15151D] border border-white/5 p-4 rounded-2xl shadow-xl flex flex-col justify-between space-y-3"
+                  className="bg-[#15151D] border border-white/5 p-4 sm:p-5 rounded-2xl shadow-xl flex flex-col justify-between space-y-3"
                 >
                   <div className="flex items-start justify-between gap-2">
                     <div>
-                      <h4 className="text-sm font-bold text-white font-mono">{ex.name}</h4>
+                      <h4 className="text-sm sm:text-base font-bold text-white font-mono">{ex.name}</h4>
                       <span
-                        className="text-[9px] px-2 py-0.5 rounded-full border font-mono font-bold mt-1 inline-block"
+                        className="text-[9px] sm:text-[10px] px-2 py-0.5 rounded-full border font-mono font-bold mt-1 inline-block"
                         style={{
                           backgroundColor: currentTheme.accentBg,
                           borderColor: currentTheme.borderActive,
@@ -4060,21 +3886,21 @@ export default function App() {
                   <div className="grid grid-cols-3 gap-2 bg-[#101016] p-2.5 rounded-xl border border-white/5 text-center font-mono">
                     <div>
                       <span className="text-[9px] text-[#92929F] uppercase">Start</span>
-                      <div className="text-xs font-bold text-white">{ex.startBpm} BPM</div>
+                      <div className="text-xs sm:text-sm font-bold text-white">{ex.startBpm} BPM</div>
                     </div>
                     <div>
                       <span className="text-[9px] text-[#92929F] uppercase">Current</span>
-                      <div className="text-xs font-bold" style={{ color: currentTheme.primary }}>{ex.currentBpm} BPM</div>
+                      <div className="text-xs sm:text-sm font-bold" style={{ color: currentTheme.primary }}>{ex.currentBpm} BPM</div>
                     </div>
                     <div>
                       <span className="text-[9px] text-[#92929F] uppercase">Target</span>
-                      <div className="text-xs font-bold text-[#3B82F6]">{ex.targetBpm} BPM</div>
+                      <div className="text-xs sm:text-sm font-bold text-[#3B82F6]">{ex.targetBpm} BPM</div>
                     </div>
                   </div>
 
                   <button
                     onClick={() => loadExerciseIntoRoutine(ex)}
-                    className="w-full py-2 rounded-xl text-white font-bold text-xs transition-all active:scale-95 font-mono flex items-center justify-center gap-1.5"
+                    className="w-full py-2 sm:py-2.5 rounded-xl text-white font-bold text-xs sm:text-sm transition-all active:scale-95 font-mono flex items-center justify-center gap-1.5"
                     style={{
                       backgroundColor: currentTheme.accentBg,
                       border: `1px solid ${currentTheme.borderActive}`,
@@ -4092,11 +3918,11 @@ export default function App() {
 
         {/* MODULE 5: PRACTICE HISTORY */}
         {activeTab === 'history' && (
-          <div className="space-y-4 sm:space-y-6">
+          <div className="space-y-4 sm:space-y-6 w-full flex-1">
             <div className="flex items-center justify-between pb-1 flex-wrap gap-2">
               <div>
-                <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-white font-mono flex items-center gap-2">
-                  <Calendar className="w-5 h-5" style={{ color: currentTheme.primary }} />
+                <h2 className="text-xl sm:text-2xl lg:text-3xl font-bold tracking-tight text-white font-mono flex items-center gap-2">
+                  <Calendar className="w-5 h-5 lg:w-6 lg:h-6" style={{ color: currentTheme.primary }} />
                   Practice History & Logs
                 </h2>
                 <p className="text-xs sm:text-sm text-[#92929F]">Step-by-step logs, verified tempo gains & technique notes.</p>
@@ -4104,7 +3930,7 @@ export default function App() {
 
               <button
                 onClick={exportHistoryJson}
-                className="px-3.5 py-1.5 rounded-xl bg-[#15151D] border border-white/10 hover:border-white/20 text-xs font-bold text-white flex items-center gap-1.5 font-mono"
+                className="px-3.5 py-1.5 rounded-xl bg-[#15151D] border border-white/10 hover:border-white/20 text-xs sm:text-sm font-bold text-white flex items-center gap-1.5 font-mono"
               >
                 <Download className="w-3.5 h-3.5" />
                 BACKUP JSON
@@ -4126,26 +3952,26 @@ export default function App() {
               const durationDelta = (latest.totalDurationMinutes || 0) - (prev.totalDurationMinutes || 0);
 
               return (
-                <div className="bg-[#15151D] border border-white/5 rounded-2xl p-4 sm:p-5 shadow-lg flex items-center justify-between flex-wrap gap-3">
+                <div className="bg-[#15151D] border border-white/5 rounded-2xl p-4 sm:p-5 shadow-lg flex items-center justify-between flex-wrap gap-3 w-full">
                   <div className="flex items-center gap-3">
                     <div
-                      className="w-9 h-9 rounded-xl flex items-center justify-center"
+                      className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center"
                       style={{
                         backgroundColor: currentTheme.accentBg,
                         color: currentTheme.primary
                       }}
                     >
-                      <Zap className="w-4 h-4" />
+                      <Zap className="w-4 h-4 sm:w-5 sm:h-5" />
                     </div>
                     <div>
-                      <h4 className="text-xs sm:text-sm font-bold text-white font-mono">Latest vs Previous Session Delta</h4>
-                      <p className="text-[11px] text-[#92929F] font-mono">
+                      <h4 className="text-xs sm:text-sm lg:text-base font-bold text-white font-mono">Latest vs Previous Session Delta</h4>
+                      <p className="text-[11px] sm:text-xs text-[#92929F] font-mono">
                         {latest.date} vs {prev.date}
                       </p>
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-3 sm:gap-6 text-xs font-mono">
+                  <div className="flex items-center gap-3 sm:gap-6 lg:gap-8 text-xs sm:text-sm font-mono">
                     <div>
                       <span className="text-[10px] text-[#92929F] uppercase block">Edge Delta</span>
                       <span className={`font-bold ${edgeDelta >= 0 ? 'text-[#10B981]' : 'text-[#EF4444]'}`}>
@@ -4169,14 +3995,14 @@ export default function App() {
               );
             })()}
 
-            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 bg-[#15151D] p-2.5 sm:p-3 rounded-2xl border border-white/5">
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 bg-[#15151D] p-2.5 sm:p-3 rounded-2xl border border-white/5 w-full">
               <div className="flex-1 relative">
                 <input
                   type="text"
                   placeholder="Search by focus tag, note, or date..."
                   value={historySearchTerm}
                   onChange={(e) => setHistorySearchTerm(e.target.value)}
-                  className="w-full bg-[#101016] border border-white/10 rounded-xl px-3 py-1.5 text-xs text-white placeholder-[#92929F] focus:outline-none"
+                  className="w-full bg-[#101016] border border-white/10 rounded-xl px-3 py-1.5 sm:py-2 text-xs sm:text-sm text-white placeholder-[#92929F] focus:outline-none"
                   style={{ borderColor: 'rgba(255,255,255,0.08)' }}
                 />
               </div>
@@ -4186,7 +4012,7 @@ export default function App() {
                 <select
                   value={historySortOrder}
                   onChange={(e) => setHistorySortOrder(e.target.value)}
-                  className="bg-[#101016] border border-white/10 rounded-xl px-2.5 py-1.5 text-xs text-white focus:outline-none"
+                  className="bg-[#101016] border border-white/10 rounded-xl px-2.5 py-1.5 text-xs sm:text-sm text-white focus:outline-none"
                 >
                   <option value="newest">Newest First</option>
                   <option value="oldest">Oldest First</option>
@@ -4196,6 +4022,7 @@ export default function App() {
               </div>
             </div>
 
+            {/* Filtered List */}
             {(() => {
               const filtered = historySessions.filter(s => {
                 if (!historySearchTerm.trim()) return true;
@@ -4216,70 +4043,72 @@ export default function App() {
 
               if (sorted.length === 0) {
                 return (
-                  <div className="bg-[#15151D] border border-white/5 rounded-2xl p-8 text-center">
+                  <div className="bg-[#15151D] border border-white/5 rounded-2xl p-8 text-center w-full">
                     <BookOpen className="w-8 h-8 text-[#92929F] mx-auto mb-2 opacity-50" />
-                    <h4 className="text-sm font-bold text-white mb-1 font-mono">No Practice Sessions Match</h4>
-                    <p className="text-xs text-[#92929F]">Try adjusting your search keywords or clear the filter.</p>
+                    <h4 className="text-sm sm:text-base font-bold text-white mb-1 font-mono">No Practice Sessions Match</h4>
+                    <p className="text-xs sm:text-sm text-[#92929F]">Try adjusting your search keywords or clear the filter.</p>
                   </div>
                 );
               }
 
               return (
-                <div className="space-y-3 sm:space-y-4">
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 sm:gap-4 w-full">
                   {sorted.map(session => (
                     <div
                       key={session.id}
                       onClick={() => setInspectedSession(session)}
-                      className="bg-[#15151D] border border-white/5 hover:border-white/20 rounded-2xl p-4 sm:p-5 shadow-lg transition-all cursor-pointer group"
+                      className="bg-[#15151D] border border-white/5 hover:border-white/20 rounded-2xl p-4 sm:p-5 shadow-lg transition-all cursor-pointer group flex flex-col justify-between"
                     >
-                      <div className="flex items-center justify-between border-b border-white/5 pb-2.5 sm:pb-3 mb-2.5 sm:mb-3">
-                        <div className="flex items-center gap-2">
-                          <Calendar className="w-4 h-4" style={{ color: currentTheme.primary }} />
-                          <div>
-                            <span className="text-xs sm:text-sm font-bold text-white group-hover:text-white transition-colors font-mono">
-                              {session.date}
-                            </span>
-                            {session.exerciseName && (
-                              <span className="text-[10px] text-[#92929F] block truncate max-w-[200px] sm:max-w-xs font-normal">
-                                {session.exerciseName}
+                      <div>
+                        <div className="flex items-center justify-between border-b border-white/5 pb-2.5 sm:pb-3 mb-2.5 sm:mb-3">
+                          <div className="flex items-center gap-2">
+                            <Calendar className="w-4 h-4" style={{ color: currentTheme.primary }} />
+                            <div>
+                              <span className="text-xs sm:text-sm font-bold text-white group-hover:text-white transition-colors font-mono">
+                                {session.date}
                               </span>
-                            )}
+                              {session.exerciseName && (
+                                <span className="text-[10px] sm:text-xs text-[#92929F] block truncate max-w-[200px] sm:max-w-xs font-normal">
+                                  {session.exerciseName}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className="text-[11px] sm:text-xs font-mono font-bold text-[#10B981] bg-[#10B981]/10 px-2 sm:px-2.5 py-0.5 rounded-full border border-[#10B981]/20">
+                              {session.totalDurationMinutes} Mins Total
+                            </span>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDeleteSession(session.id);
+                              }}
+                              title="Delete this practice session"
+                              className="p-1.5 rounded-lg bg-[#1B1B25] text-[#92929F] hover:text-[#EF4444] hover:bg-[#EF4444]/10 border border-white/5 transition-colors flex-shrink-0"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                            <ChevronRight className="w-4 h-4 text-[#92929F] group-hover:translate-x-1 transition-transform" />
                           </div>
                         </div>
-                        <div className="flex items-center gap-2">
-                          <span className="text-[11px] sm:text-xs font-mono font-bold text-[#10B981] bg-[#10B981]/10 px-2 sm:px-2.5 py-0.5 rounded-full border border-[#10B981]/20">
-                            {session.totalDurationMinutes} Mins Total
-                          </span>
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleDeleteSession(session.id);
-                            }}
-                            title="Delete this practice session"
-                            className="p-1.5 rounded-lg bg-[#1B1B25] text-[#92929F] hover:text-[#EF4444] hover:bg-[#EF4444]/10 border border-white/5 transition-colors flex-shrink-0"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
-                          <ChevronRight className="w-4 h-4 text-[#92929F] group-hover:translate-x-1 transition-transform" />
-                        </div>
-                      </div>
 
-                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3 bg-[#101016] p-2.5 sm:p-3 rounded-xl border border-white/5 mb-2.5 sm:mb-3">
-                        <div>
-                          <span className="text-[9px] sm:text-[10px] text-[#92929F] uppercase font-semibold">Comfort</span>
-                          <div className="text-xs sm:text-sm font-bold font-mono text-[#10B981]">{session.comfortBpm} BPM</div>
-                        </div>
-                        <div>
-                          <span className="text-[9px] sm:text-[10px] text-[#92929F] uppercase font-semibold">Clean Edge</span>
-                          <div className="text-xs sm:text-sm font-bold font-mono text-[#3B82F6]">{session.edgeBpm} BPM</div>
-                        </div>
-                        <div>
-                          <span className="text-[9px] sm:text-[10px] text-[#92929F] uppercase font-semibold">Speed Bursts</span>
-                          <div className="text-xs sm:text-sm font-bold font-mono text-[#EF4444]">{session.burstBpm} BPM</div>
-                        </div>
-                        <div>
-                          <span className="text-[9px] sm:text-[10px] text-[#92929F] uppercase font-semibold">Next Target</span>
-                          <div className="text-xs sm:text-sm font-bold font-mono" style={{ color: currentTheme.primary }}>{session.targetBpm} BPM</div>
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3 bg-[#101016] p-2.5 sm:p-3 rounded-xl border border-white/5 mb-2.5 sm:mb-3">
+                          <div>
+                            <span className="text-[9px] sm:text-[10px] text-[#92929F] uppercase font-semibold">Comfort</span>
+                            <div className="text-xs sm:text-sm font-bold font-mono text-[#10B981]">{session.comfortBpm} BPM</div>
+                          </div>
+                          <div>
+                            <span className="text-[9px] sm:text-[10px] text-[#92929F] uppercase font-semibold">Clean Edge</span>
+                            <div className="text-xs sm:text-sm font-bold font-mono text-[#3B82F6]">{session.edgeBpm} BPM</div>
+                          </div>
+                          <div>
+                            <span className="text-[9px] sm:text-[10px] text-[#92929F] uppercase font-semibold">Speed Bursts</span>
+                            <div className="text-xs sm:text-sm font-bold font-mono text-[#EF4444]">{session.burstBpm} BPM</div>
+                          </div>
+                          <div>
+                            <span className="text-[9px] sm:text-[10px] text-[#92929F] uppercase font-semibold">Next Target</span>
+                            <div className="text-xs sm:text-sm font-bold font-mono" style={{ color: currentTheme.primary }}>{session.targetBpm} BPM</div>
+                          </div>
                         </div>
                       </div>
 
@@ -4294,26 +4123,26 @@ export default function App() {
 
         {/* MODULE 6: MIRROR STUDIO */}
         {activeTab === 'mirror' && (
-          <div className="space-y-4 sm:space-y-6">
+          <div className="space-y-4 sm:space-y-6 w-full flex-1">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
               <div>
-                <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-white font-mono flex items-center gap-2">
-                  <Camera className="w-5 h-5" style={{ color: currentTheme.primary }} />
+                <h2 className="text-xl sm:text-2xl lg:text-3xl font-bold tracking-tight text-white font-mono flex items-center gap-2">
+                  <Camera className="w-5 h-5 lg:w-6 lg:h-6" style={{ color: currentTheme.primary }} />
                   Mirror Studio HUD
                 </h2>
                 <p className="text-xs sm:text-sm text-[#92929F]">Visual posture inspection & MediaRecorder video technique review.</p>
               </div>
 
-              <div className="flex items-center gap-2 bg-[#15151D] px-3.5 py-1.5 rounded-xl border border-white/5 text-xs">
+              <div className="flex items-center gap-2 bg-[#15151D] px-3.5 py-1.5 rounded-xl border border-white/5 text-xs sm:text-sm">
                 <span className="text-[#92929F]">Target Exercise:</span>
-                <span className="font-bold font-mono truncate max-w-[200px]" style={{ color: currentTheme.primary }}>
+                <span className="font-bold font-mono truncate max-w-[200px] sm:max-w-xs" style={{ color: currentTheme.primary }}>
                   {practiceSession.selectedExerciseName || 'Custom Routine'}
                 </span>
               </div>
             </div>
 
-            <div className="bg-[#15151D] border border-white/5 rounded-2xl p-4 sm:p-6 shadow-xl">
-              <div className="relative aspect-video max-w-2xl mx-auto bg-[#08080C] border border-white/10 rounded-xl overflow-hidden flex items-center justify-center mb-4 sm:mb-5">
+            <div className="bg-[#15151D] border border-white/5 rounded-2xl p-4 sm:p-6 lg:p-8 shadow-xl w-full">
+              <div className="relative aspect-video max-w-4xl mx-auto bg-[#08080C] border border-white/10 rounded-2xl overflow-hidden flex items-center justify-center mb-4 sm:mb-5">
                 <video
                   ref={videoRef}
                   autoPlay
@@ -4324,14 +4153,14 @@ export default function App() {
 
                 {!isCameraActive && (
                   <div className="text-center p-4 sm:p-6">
-                    <Camera className="w-10 h-10 sm:w-12 sm:h-12 text-[#92929F] mx-auto mb-2 sm:mb-3 opacity-60" />
-                    <h4 className="text-xs sm:text-sm font-bold text-white mb-1 font-mono">Camera Feed Inactive</h4>
-                    <p className="text-[11px] sm:text-xs text-[#92929F] max-w-xs mb-3 sm:mb-4">
+                    <Camera className="w-10 h-10 sm:w-14 sm:h-14 text-[#92929F] mx-auto mb-2 sm:mb-3 opacity-60" />
+                    <h4 className="text-xs sm:text-base font-bold text-white mb-1 font-mono">Camera Feed Inactive</h4>
+                    <p className="text-[11px] sm:text-xs text-[#92929F] max-w-sm mb-3 sm:mb-4">
                       Inspect pick slanting, thumb anchors, and shoulder relaxation in real time.
                     </p>
                     <button
                       onClick={startCamera}
-                      className="px-4 sm:px-5 py-2 sm:py-2.5 rounded-xl text-white font-extrabold text-xs shadow hover:brightness-110 active:scale-95 font-mono"
+                      className="px-4 sm:px-6 py-2 sm:py-2.5 rounded-xl text-white font-extrabold text-xs sm:text-sm shadow hover:brightness-110 active:scale-95 font-mono"
                       style={{
                         backgroundColor: currentTheme.primary,
                         boxShadow: `0 0 15px ${currentTheme.glow}`
@@ -4355,7 +4184,7 @@ export default function App() {
                   {!isRecording ? (
                     <button
                       onClick={startRecording}
-                      className="px-5 sm:px-6 py-2 sm:py-2.5 rounded-xl bg-[#EF4444] text-white font-bold text-xs flex items-center gap-2 hover:brightness-110 active:scale-95 shadow-[0_0_15px_rgba(239,68,68,0.35)] font-mono"
+                      className="px-5 sm:px-6 py-2 sm:py-2.5 rounded-xl bg-[#EF4444] text-white font-bold text-xs sm:text-sm flex items-center gap-2 hover:brightness-110 active:scale-95 shadow-[0_0_15px_rgba(239,68,68,0.35)] font-mono"
                     >
                       <Video className="w-4 h-4" />
                       RECORD TAKE
@@ -4363,7 +4192,7 @@ export default function App() {
                   ) : (
                     <button
                       onClick={stopRecording}
-                      className="px-5 sm:px-6 py-2 sm:py-2.5 rounded-xl bg-[#EF4444] text-white font-bold text-xs flex items-center gap-2 animate-pulse active:scale-95 font-mono"
+                      className="px-5 sm:px-6 py-2 sm:py-2.5 rounded-xl bg-[#EF4444] text-white font-bold text-xs sm:text-sm flex items-center gap-2 animate-pulse active:scale-95 font-mono"
                     >
                       <Square className="w-4 h-4 fill-current" />
                       STOP & ATTACH TO LOG
@@ -4372,7 +4201,7 @@ export default function App() {
 
                   <button
                     onClick={stopCamera}
-                    className="px-3.5 sm:px-4 py-2 sm:py-2.5 rounded-xl bg-[#1B1B25] border border-white/10 text-xs font-semibold text-white hover:bg-[#252533] active:scale-95"
+                    className="px-3.5 sm:px-4 py-2 sm:py-2.5 rounded-xl bg-[#1B1B25] border border-white/10 text-xs sm:text-sm font-semibold text-white hover:bg-[#252533] active:scale-95"
                   >
                     Close Camera
                   </button>
@@ -4384,7 +4213,7 @@ export default function App() {
       </main>
 
       {/* MOBILE BOTTOM NAVIGATION BAR */}
-      <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-[#0E0E14]/95 backdrop-blur-lg border-t border-white/10 px-2 py-2 flex items-center justify-around">
+      <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-[#0E0E14]/95 backdrop-blur-lg border-t border-white/10 px-2 py-2 safe-area-bottom flex items-center justify-around w-full">
         {[
           { id: 'daily', label: 'Daily', icon: Activity },
           { id: 'metronome', label: 'Metro', icon: Clock },
