@@ -396,7 +396,13 @@ const GX_THEMES = {
 };
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState('daily');
+  const [activeTab, setActiveTab] = useState(() => {
+    try {
+      return localStorage.getItem('gps_active_tab') || 'daily';
+    } catch {
+      return 'daily';
+    }
+  });
   const [isPlaying, setIsPlaying] = useState(false);
   const [bpm, setBpm] = useState(80);
   const [selectedSubdivision, setSelectedSubdivision] = useState(SUBDIVISIONS[0]);
@@ -799,10 +805,26 @@ export default function App() {
       } else {
         setIsAuthenticated(false);
       }
+
+      // Restore active tab if previously saved
+      const savedTab = localStorage.getItem('gps_active_tab');
+      if (savedTab && ['daily', 'metronome', 'progress', 'library', 'history', 'mirror'].includes(savedTab)) {
+        setActiveTab(savedTab);
+      }
     } catch {
       setIsAuthenticated(false);
     }
   }, []);
+
+  // Persist tab changes so refreshes stay on the active page
+  const handleTabChange = (tabId) => {
+    setActiveTab(tabId);
+    try {
+      localStorage.setItem('gps_active_tab', tabId);
+    } catch {}
+    if (tabId === 'metronome') setActiveMetronomeMode('standard');
+    audioEngine.playUiSound('step');
+  };
 
   // Login authentication handler for the initial lock gateway
   const handleGatewayLogin = (e) => {
@@ -1289,7 +1311,7 @@ export default function App() {
         e.preventDefault();
         const stepNum = parseInt(e.key, 10);
         if (stepNum >= 1 && stepNum <= 4) {
-          setActiveTab('daily');
+          handleTabChange('daily');
           setCurrentStepOpen(stepNum);
           audioEngine.playUiSound('step');
         }
@@ -1866,7 +1888,7 @@ export default function App() {
       targetBpm: Math.min(320, ex.currentBpm + 5)
     }));
 
-    setActiveTab('daily');
+    handleTabChange('daily');
     setCurrentStepOpen(1);
     updateStepBpm(1, comfortTempo);
   };
@@ -1965,7 +1987,7 @@ export default function App() {
     });
 
     setIsLogModalOpen(false);
-    setActiveTab('progress');
+    handleTabChange('progress');
   };
 
   const toggleCalendarDate = (dateStr) => {
@@ -2791,10 +2813,7 @@ export default function App() {
             return (
               <button
                 key={tab.id}
-                onClick={() => {
-                  setActiveTab(tab.id);
-                  if (tab.id === 'metronome') setActiveMetronomeMode('standard');
-                }}
+                onClick={() => handleTabChange(tab.id)}
                 className="flex items-center gap-2 px-3 lg:px-4 py-1.5 rounded-lg text-xs lg:text-sm font-semibold font-gx-display transition-all relative overflow-hidden"
                 style={{
                   backgroundColor: isActive ? '#1B1B25' : 'transparent',
@@ -4498,10 +4517,7 @@ export default function App() {
           return (
             <button
               key={item.id}
-              onClick={() => {
-                setActiveTab(item.id);
-                audioEngine.playUiSound('step');
-              }}
+              onClick={() => handleTabChange(item.id)}
               className="flex flex-col items-center justify-center p-1 rounded-xl transition-all"
               style={{ color: isActive ? currentTheme.primary : '#92929F' }}
             >
