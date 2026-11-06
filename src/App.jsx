@@ -6,7 +6,8 @@ import {
   HelpCircle, ChevronDown, ChevronUp, Music, ArrowUp, ArrowDown,
   Square, Download, Upload, Trash2, Award, Flame, Target, Compass,
   Menu, X, Film, CheckCircle2, TrendingUp, Palette, ShieldCheck, Keyboard,
-  Cloud, CloudCheck, RefreshCcw, User, Users, Lock, Unlock, KeyRound
+  Cloud, CloudCheck, RefreshCcw, User, Users, Lock, Unlock, KeyRound,
+  LogOut, ShieldAlert
 } from 'lucide-react';
 
 // ============================================================================
@@ -377,6 +378,14 @@ export default function App() {
   const [isHotkeysModalOpen, setIsHotkeysModalOpen] = useState(false);
 
   // --------------------------------------------------------------------------
+  // MANDATORY PROFILE GATEWAY & AUTHENTICATION STATE
+  // --------------------------------------------------------------------------
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [selectedLoginUser, setSelectedLoginUser] = useState(null);
+  const [loginPinInput, setLoginPinInput] = useState('');
+  const [loginErrorMessage, setLoginErrorMessage] = useState('');
+
+  // --------------------------------------------------------------------------
   // MULTI-USER ISOLATION & PIN LOCK SYSTEM
   // --------------------------------------------------------------------------
   const [activeUserId, setActiveUserId] = useState('user1'); // 'user1' (Master Admin) | 'user2' | 'user3'...
@@ -490,7 +499,7 @@ export default function App() {
   const [step2SettingsOpen, setStep2SettingsOpen] = useState(false);
   const [step3SettingsOpen, setStep3SettingsOpen] = useState(false);
 
-  // Speed training configuration (Screenshot 1 replica)
+  // Speed training configuration
   const [speedConfig, setSpeedConfig] = useState({
     timeSignature: TIME_SIGNATURES[2],
     startBpm: 80,
@@ -520,7 +529,7 @@ export default function App() {
 
   const [speedSummary, setSpeedSummary] = useState(null);
 
-  // Ratios training configuration (Screenshot 2 replica)
+  // Ratios training configuration
   const [ratiosConfig, setRatiosConfig] = useState({
     bpm: 80,
     numberOfBeats: 4,
@@ -670,7 +679,6 @@ export default function App() {
       const savedProfiles = localStorage.getItem('gps_user_profiles');
       if (savedProfiles) {
         const parsedProfiles = JSON.parse(savedProfiles);
-        // Ensure Guitarist 1 retains admin privileges and default PIN fallback
         const merged = {
           ...parsedProfiles,
           user1: {
@@ -685,7 +693,6 @@ export default function App() {
           setSyncKey(merged[uid].syncKey);
           fetchCloudData(merged[uid].syncKey);
         } else {
-          // Guarantee every profile has a generated sync key ready to go
           const generatedKey = `g_${(merged[uid]?.name || uid).toLowerCase().replace(/[^a-z0-9]/g, '')}_${Math.random().toString(36).substring(2, 6)}`;
           const updatedWithKey = {
             ...merged,
@@ -712,7 +719,6 @@ export default function App() {
       const savedExercises = localStorage.getItem(`gps_exercises_${uid}`);
       if (savedExercises) setExercises(JSON.parse(savedExercises));
       else {
-        // Default starting exercises for a fresh profile
         setExercises([
           { id: 'ex-1', name: 'Chromatic Warmup (1-2-3-4)', category: 'Chromatic', startBpm: 70, currentBpm: 100, targetBpm: 140, lastPracticed: '2026-11-04', sessionsCount: 1, bestBurstBpm: 115 },
           { id: 'ex-2', name: 'Paul Gilbert 6-Note Picking', category: 'Alternate Picking', startBpm: 80, currentBpm: 110, targetBpm: 160, lastPracticed: '2026-11-04', sessionsCount: 1, bestBurstBpm: 125 }
@@ -727,14 +733,67 @@ export default function App() {
     }
   };
 
-  // Local storage initialization
+  // Local storage initialization & Profile Profiles Pre-loader
   useEffect(() => {
     try {
-      const savedLastUser = localStorage.getItem('gps_active_user') || 'user1';
-      setActiveUserId(savedLastUser);
-      loadUserData(savedLastUser);
+      const savedProfiles = localStorage.getItem('gps_user_profiles');
+      if (savedProfiles) {
+        const parsedProfiles = JSON.parse(savedProfiles);
+        const merged = {
+          ...parsedProfiles,
+          user1: {
+            ...parsedProfiles.user1,
+            pin: parsedProfiles.user1?.pin || '7779',
+            name: parsedProfiles.user1?.name || 'Guitarist 1 (Admin)',
+            isAdmin: true
+          }
+        };
+        setUserProfiles(merged);
+      }
     } catch {}
+    // Intentionally keep isAuthenticated as false upon first load/share
+    setIsAuthenticated(false);
   }, []);
+
+  // Login authentication handler for the initial lock gateway
+  const handleGatewayLogin = (e) => {
+    e?.preventDefault();
+    if (!selectedLoginUser) {
+      setLoginErrorMessage('Please select a guitarist profile to continue.');
+      return;
+    }
+
+    const prof = userProfiles[selectedLoginUser];
+    if (!prof) {
+      setLoginErrorMessage('Profile not found.');
+      return;
+    }
+
+    if (prof.pin && loginPinInput !== prof.pin) {
+      setLoginErrorMessage('Access Denied: Incorrect PIN code.');
+      audioEngine.playUiSound('step');
+      return;
+    }
+
+    // Successfully verified!
+    performUserSwitch(selectedLoginUser);
+    setIsAuthenticated(true);
+    setLoginErrorMessage('');
+    setLoginPinInput('');
+    audioEngine.playUiSound('step');
+  };
+
+  // Sign out / Lock studio back to gateway
+  const handleLockStudio = () => {
+    stopAllMetronomes();
+    setIsAuthenticated(false);
+    setSelectedLoginUser(null);
+    setLoginPinInput('');
+    setLoginErrorMessage('');
+    setIsProfileModalOpen(false);
+    setIsPinModalOpen(false);
+    audioEngine.playUiSound('step');
+  };
 
   // Save current profile metadata whenever changed
   const saveUserProfiles = (updated) => {
@@ -744,7 +803,6 @@ export default function App() {
     } catch {}
   };
 
-  // Profile Switching with PIN Verification
   const requestSwitchUser = (targetId) => {
     if (targetId === activeUserId) {
       setIsProfileModalOpen(false);
@@ -753,14 +811,12 @@ export default function App() {
 
     const targetProfile = userProfiles[targetId];
     if (targetProfile.pin) {
-      // Target profile is protected by a PIN!
       setTargetSwitchUser(targetId);
       setEnteredPin('');
       setPinError('');
       setIsPinModalOpen(true);
       setIsProfileModalOpen(false);
     } else {
-      // No PIN set, switch directly
       performUserSwitch(targetId);
       setIsProfileModalOpen(false);
     }
@@ -794,7 +850,6 @@ export default function App() {
     setPinChangeError('');
     const activeProf = userProfiles[activeUserId];
 
-    // Require current PIN verification before allowing change
     if (activeProf.pin && currentPinVerify !== activeProf.pin) {
       setPinChangeError('Current PIN is incorrect. Verification failed.');
       audioEngine.playUiSound('step');
@@ -833,7 +888,6 @@ export default function App() {
     saveUserProfiles(updated);
   };
 
-  // ADMIN-ONLY HANDLERS (Guitarist 1 / user1 exclusive)
   const handleAdminCreateProfile = (e) => {
     e?.preventDefault();
     if (activeUserId !== 'user1') {
@@ -885,7 +939,6 @@ export default function App() {
     const updated = { ...userProfiles };
     delete updated[targetId];
 
-    // Clean up associated local storage
     try {
       localStorage.removeItem(`gps_history_${targetId}`);
       localStorage.removeItem(`gps_exercises_${targetId}`);
@@ -898,9 +951,7 @@ export default function App() {
     audioEngine.playUiSound('step');
   };
 
-  // CLOUD SYNC ENGINE (Synchronizes PC & Phone per isolated user)
   const syncToCloud = async (overrideData = null) => {
-    // Universal sync resolution: works dynamically for active user regardless of role
     const activeSyncKey = userProfiles[activeUserId]?.syncKey || syncKey || `g_${activeUserId}`;
     if (!activeSyncKey) {
       setSyncStatus('error');
@@ -921,7 +972,6 @@ export default function App() {
     const cleanKey = `wgs_${activeUserId}_${activeSyncKey.replace(/[^a-zA-Z0-9_-]/g, '')}`;
 
     try {
-      // Direct relay to ntfy publish cache (reliable, instant, CORS-enabled for iOS & Android)
       const res = await fetch(`https://ntfy.sh/${cleanKey}`, {
         method: 'POST',
         headers: {
@@ -959,7 +1009,6 @@ export default function App() {
     const cleanKey = `wgs_${activeUserId}_${rawKey.replace(/[^a-zA-Z0-9_-]/g, '')}`;
 
     try {
-      // 1. First attempt: fetch from the ntfy JSON cache
       let fetchedData = null;
       try {
         const ntfyRes = await fetch(`https://ntfy.sh/${cleanKey}/json?poll=1`);
@@ -980,7 +1029,6 @@ export default function App() {
         }
       } catch {}
 
-      // 2. Fallback attempt: query restful-api bin
       if (!fetchedData) {
         const res = await fetch(`https://api.restful-api.dev/objects`);
         if (res.ok) {
@@ -1024,22 +1072,6 @@ export default function App() {
     } finally {
       setIsSyncing(false);
     }
-  };
-
-  const handleConnectSyncKey = (newKey) => {
-    const clean = newKey.trim().toLowerCase();
-    if (!clean) return;
-    setSyncKey(clean);
-    const updated = {
-      ...userProfiles,
-      [activeUserId]: {
-        ...userProfiles[activeUserId],
-        syncKey: clean
-      }
-    };
-    saveUserProfiles(updated);
-    fetchCloudData(clean);
-    setIsSyncModalOpen(false);
   };
 
   const changeTheme = (key) => {
@@ -1119,7 +1151,7 @@ export default function App() {
     };
   }, [isRecording]);
 
-  // Global Keyboard Shortcuts (Space: Play/Pause, Up/Down: BPM change)
+  // Global Keyboard Shortcuts
   useEffect(() => {
     const handleKeyDown = (e) => {
       if (['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement?.tagName)) return;
@@ -1207,7 +1239,6 @@ export default function App() {
     }
   };
 
-  // Speed Training Controller Logic
   const startSpeedTraining = () => {
     const totalSteps = Math.floor((speedConfig.endBpm - speedConfig.startBpm) / speedConfig.bpmIncrement) + 1;
     audioEngine.stop();
@@ -1254,7 +1285,6 @@ export default function App() {
     setSpeedProgress(prev => ({ ...prev, isActive: false, isPaused: false, stage: 'idle' }));
   };
 
-  // Ratios Training Controller Logic
   const startRatiosTraining = () => {
     audioEngine.stop();
     const ts = { beats: ratiosConfig.numberOfBeats, noteValue: 4 };
@@ -1305,15 +1335,12 @@ export default function App() {
     }));
   };
 
-  // Audio Engine Beat Scheduler Callback
   useEffect(() => {
     audioEngine.onBeat = (beatNumber, isBarStart) => {
-      // Determine currently active training mode across both Metronome tab and Step tabs
       const currentMode = activeTab === 'daily'
         ? (currentStepOpen === 1 ? step1SubTab : currentStepOpen === 2 ? step2SubTab : step3SubTab)
         : activeMetronomeMode;
 
-      // Speed Training Engine Synchronization
       if (currentMode === 'speed' && speedProgress.isActive && !speedProgress.isPaused) {
         setSpeedProgress(prev => {
           const s = { ...prev };
@@ -1337,19 +1364,16 @@ export default function App() {
           if (s.currentBeat < beatsPerBar) {
             s.currentBeat += 1;
           } else {
-            // Completed a full bar
             s.currentBeat = 1;
 
             if (s.currentBar < speedConfig.barsPerLoop) {
               s.currentBar += 1;
             } else {
-              // Completed all bars in the current loop
               s.currentBar = 1;
 
               if (s.currentLoop < speedConfig.loopsBeforeIncrease) {
                 s.currentLoop += 1;
               } else {
-                // Completed all loops in the current stage: Advance BPM
                 s.currentLoop = 1;
                 s.completedStages += 1;
                 const nextStageBpm = s.currentBpm + speedConfig.bpmIncrement;
@@ -1386,7 +1410,6 @@ export default function App() {
         });
       }
 
-      // Ratios Training Engine Synchronization
       if (currentMode === 'ratios' && ratiosProgress.isActive && !ratiosProgress.isPaused) {
         setRatiosProgress(prev => {
           const r = { ...prev };
@@ -1406,16 +1429,13 @@ export default function App() {
             }
           }
 
-          // Advance beat within loop
           if (r.currentBeat < ratiosConfig.numberOfBeats) {
             r.currentBeat += 1;
           } else {
-            // Completed configured number of beats for current loop
             if (ratiosConfig.subdivisionRatioEnabled) {
               const nextLoop = r.activeLoop === 1 ? 2 : 1;
               const nextSubdiv = nextLoop === 1 ? ratiosConfig.loop1 : ratiosConfig.loop2;
 
-              // Check if repeat count in is enabled between cycle completions (after loop 2 finishes)
               if (r.activeLoop === 2 && ratiosConfig.countInEnabled && ratiosConfig.repeatCountIn > 0) {
                 r.isCountIn = true;
                 r.countInRemaining = ratiosConfig.repeatCountIn;
@@ -1431,7 +1451,6 @@ export default function App() {
               r.currentBeat = 1;
               audioEngine.setSubdivision(nextSubdiv);
             } else {
-              // Single loop mode: stay locked on loop 1
               r.activeLoop = 1;
               r.currentSubdivision = ratiosConfig.loop1;
               r.currentBeat = 1;
@@ -1453,7 +1472,7 @@ export default function App() {
     ratiosConfig, ratiosProgress.isActive, ratiosProgress.isPaused
   ]);
 
-  // Sync visualizer loop (High precision requestAnimationFrame)
+  // Visualizer loop
   useEffect(() => {
     let animId;
     const checkScheduledNotes = () => {
@@ -1481,7 +1500,6 @@ export default function App() {
     return () => cancelAnimationFrame(animId);
   }, []);
 
-  // Standard Metronome Play/Pause toggle
   const togglePlay = (targetBpm = bpm, targetSubdiv = selectedSubdivision) => {
     if (isPlaying) {
       audioEngine.stop();
@@ -1498,7 +1516,6 @@ export default function App() {
     }
   };
 
-  // Speed burst pulse helper
   const triggerSpeedBurst = (beatsCount) => {
     audioEngine.stop();
     audioEngine.setBpm(practiceSession.step3.bpm);
@@ -1519,7 +1536,6 @@ export default function App() {
     }, totalDurationMs);
   };
 
-  // Tap tempo calculation
   const handleTapTempo = () => {
     const now = performance.now();
     const times = tapTimesRef.current;
@@ -1542,7 +1558,6 @@ export default function App() {
     }
   };
 
-  // Timer controls
   const toggleTimer = (stepKey) => {
     setPracticeSession(prev => ({
       ...prev,
@@ -1578,7 +1593,6 @@ export default function App() {
     }));
   };
 
-  // Focus Area Tag Toggle
   const toggleFocusArea = (stepKey, tag) => {
     setPracticeSession(prev => {
       const currentTags = prev[stepKey].focusAreas;
@@ -1594,20 +1608,6 @@ export default function App() {
     });
   };
 
-  const addCustomFocusTag = (stepKey) => {
-    if (!customTagInput.trim()) return;
-    const tag = customTagInput.trim();
-    setPracticeSession(prev => ({
-      ...prev,
-      [stepKey]: {
-        ...prev[stepKey],
-        focusAreas: [...new Set([...prev[stepKey].focusAreas, tag])]
-      }
-    }));
-    setCustomTagInput('');
-  };
-
-  // Step BPM updates
   const updateStepBpm = (stepNum, newBpm) => {
     const clamped = Math.max(30, Math.min(320, newBpm));
     const stepKey = `step${stepNum}`;
@@ -1620,7 +1620,6 @@ export default function App() {
     }
   };
 
-  // Exercise Library Handlers
   const handleCreateExercise = (e) => {
     e?.preventDefault();
     if (!newExerciseData.name.trim()) return;
@@ -1659,7 +1658,6 @@ export default function App() {
     });
   };
 
-  // Delete a specific session
   const handleDeleteSession = (sessionId) => {
     setHistorySessions(prev => {
       const updated = prev.filter(s => s.id !== sessionId);
@@ -1670,13 +1668,11 @@ export default function App() {
     });
   };
 
-  // ONE-CLICK EXERCISE LOADER: Automatically wires an exercise from library into daily practice
   const loadExerciseIntoRoutine = (ex) => {
     const comfortTempo = Math.round(ex.currentBpm * 0.75);
     const edgeTempo = ex.currentBpm;
     const burstTempo = Math.min(320, ex.currentBpm + 15);
 
-    // Map category to smart default focus tags
     let defaultStep1Focus = ['Relaxation', 'Synchronization'];
     let defaultStep2Focus = ['Note Clarity'];
     if (ex.category === 'Sweep Picking') {
@@ -1729,9 +1725,7 @@ export default function App() {
     updateStepBpm(1, comfortTempo);
   };
 
-  // DEEP UNIFIED SESSION LOGGING (Interconnects History, Library, Calendar, & Progress)
   const handleSaveSession = () => {
-    // Calculate actual elapsed minutes (or fallback to planned duration)
     const calcMinutes = (sec, planMins) => (sec > 30 ? Math.ceil(sec / 60) : planMins);
     const s1Elapsed = calcMinutes(practiceSession.step1.elapsedSeconds, practiceSession.step1.durationMinutes);
     const s2Elapsed = calcMinutes(practiceSession.step2.elapsedSeconds, practiceSession.step2.durationMinutes);
@@ -1743,7 +1737,6 @@ export default function App() {
     const exerciseName = practiceSession.selectedExerciseName || 'Custom / Free Practice Routine';
     const exerciseCategory = practiceSession.selectedCategory || 'Technique';
 
-    // 1. Build Comprehensive History Session
     const newSession = {
       id: `session-${Date.now()}`,
       userId: activeUserId,
@@ -1771,7 +1764,6 @@ export default function App() {
 
     setHistorySessions(prev => [newSession, ...prev]);
 
-    // 2. Automatically Update Exercise in Library for this user
     let updatedExercises = exercises;
     if (practiceSession.selectedExerciseId && practiceSession.selectedExerciseId !== 'custom') {
       updatedExercises = exercises.map(ex => {
@@ -1792,7 +1784,6 @@ export default function App() {
       } catch {}
     }
 
-    // 3. Automatically Update Consistency Calendar for this user
     let updatedCalendar = practicedCalendarDays;
     if (!practicedCalendarDays.includes(todayStr)) {
       updatedCalendar = [...practicedCalendarDays, todayStr];
@@ -1802,7 +1793,6 @@ export default function App() {
       } catch {}
     }
 
-    // 4. Mark all steps as complete in active session state
     setPracticeSession(prev => ({
       ...prev,
       step1: { ...prev.step1, isCompleted: true, elapsedSeconds: 0 },
@@ -1811,13 +1801,11 @@ export default function App() {
       step4: { ...prev.step4, isCompleted: true, elapsedSeconds: 0 }
     }));
 
-    // 5. Save History to user-specific localStorage permanently
     const updatedHistory = [newSession, ...historySessions];
     try {
       localStorage.setItem(`gps_history_${activeUserId}`, JSON.stringify(updatedHistory));
     } catch {}
 
-    // 6. Broadcast to Cloud for this specific user's sync key
     syncToCloud({
       userId: activeUserId,
       profileName: userProfiles[activeUserId]?.name,
@@ -1831,14 +1819,12 @@ export default function App() {
     setActiveTab('progress');
   };
 
-  // Calendar toggle for retroactive logging
   const toggleCalendarDate = (dateStr) => {
     setPracticedCalendarDays(prev =>
       prev.includes(dateStr) ? prev.filter(d => d !== dateStr) : [...prev, dateStr]
     );
   };
 
-  // Video recording controls for Mirror Studio
   const startCamera = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
@@ -1848,7 +1834,6 @@ export default function App() {
       }
       setIsCameraActive(true);
     } catch {
-      // Graceful fallback for simulator
       setIsCameraActive(true);
     }
   };
@@ -1878,7 +1863,6 @@ export default function App() {
         const blob = new Blob(recordedChunksRef.current, { type: 'video/webm' });
         const url = URL.createObjectURL(blob);
         setRecordedVideoUrl(url);
-        // Link to Step 4 session state immediately
         setPracticeSession(prev => ({
           ...prev,
           step4: { ...prev.step4, hasRecording: true, recordedVideoBlobUrl: url }
@@ -1900,7 +1884,6 @@ export default function App() {
     }
   };
 
-  // Export / Import History
   const exportHistoryJson = () => {
     const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify({
       historySessions,
@@ -1913,9 +1896,6 @@ export default function App() {
     dlAnchorElem.click();
   };
 
-  // ==========================================================================
-  // RENDER: PURE DOT-BASED RHYTHMIC VISUALISER (Exact card per beat)
-  // ==========================================================================
   const renderDotVisualiser = (subdiv = selectedSubdivision, currentBpm = bpm, customBeatsCount = null) => {
     const beatsCount = customBeatsCount || timeSignature.beats || 4;
     const dotsCount = subdiv?.dotsPerBeat || 1;
@@ -1942,7 +1922,6 @@ export default function App() {
                     : 'none'
                 }}
               >
-                {/* Subtle top indicator bar on active beat */}
                 {isCurrentBeat && (
                   <div
                     className="absolute top-0 left-0 right-0 h-[2px] transition-all"
@@ -1999,7 +1978,6 @@ export default function App() {
 
     return (
       <div className="space-y-3 pt-2">
-        {/* Mode Selector Strip */}
         <div className="flex items-center justify-between gap-2 flex-wrap">
           <div className="flex items-center gap-1 bg-[#101016] p-1 rounded-xl border border-white/5">
             {['standard', 'speed', 'ratios'].map(mode => (
@@ -2028,16 +2006,13 @@ export default function App() {
           </button>
         </div>
 
-        {/* 1. STANDARD METRONOME (CLEAN & EFFICIENT) */}
         {activeSubTab === 'standard' && (
           <div className="bg-[#15151D] border border-white/5 rounded-2xl p-3.5 sm:p-5 shadow-xl relative overflow-hidden">
-            {/* Ambient subtle glow */}
             <div
               className="absolute -top-16 left-1/2 -translate-x-1/2 w-48 h-24 rounded-full pointer-events-none blur-3xl opacity-20"
               style={{ backgroundColor: currentTheme.primary }}
             />
 
-            {/* Prominent BPM Display */}
             <div className="flex flex-col items-center justify-center pt-1 pb-1 relative z-10">
               <div className="text-6xl sm:text-8xl font-black font-gx-num tracking-tight text-white leading-none">
                 {currentStepBpm}
@@ -2047,10 +2022,8 @@ export default function App() {
               </div>
             </div>
 
-            {/* Pure Dot-Based Visualizer (Directly Below BPM) */}
             {renderDotVisualiser(stepSubdiv, currentStepBpm)}
 
-            {/* Essential Controls Row - Touch Ergonomic */}
             <div className="flex flex-col items-center justify-center pt-1 sm:pt-2 relative z-10">
               <div className="flex items-center gap-1.5 sm:gap-2.5 w-full justify-center max-w-sm">
                 <button
@@ -2070,7 +2043,7 @@ export default function App() {
                   className="flex-[2] sm:flex-none px-4 sm:px-8 py-2.5 sm:py-3 rounded-2xl text-xs sm:text-sm font-extrabold font-gx-display flex items-center justify-center gap-1.5 sm:gap-2 transition-all active:scale-95"
                   style={{
                     backgroundColor: isPlaying ? '#EF4444' : currentTheme.primary,
-                    color: isPlaying ? '#FFFFFF' : '#FFFFFF',
+                    color: '#FFFFFF',
                     boxShadow: isPlaying
                       ? '0 0 20px rgba(239, 68, 68, 0.45)'
                       : `0 0 20px ${currentTheme.glow}`
@@ -2093,7 +2066,6 @@ export default function App() {
                 </button>
               </div>
 
-              {/* Slider */}
               <div className="w-full max-w-sm mt-3.5 sm:mt-4 flex items-center gap-3">
                 <input
                   type="range"
@@ -2107,7 +2079,6 @@ export default function App() {
               </div>
             </div>
 
-            {/* Click-to-Expand Settings */}
             {isSettingsOpen && (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-4 pt-4 border-t border-white/5 animate-in fade-in duration-200">
                 <div>
@@ -2169,10 +2140,8 @@ export default function App() {
           </div>
         )}
 
-        {/* 2. SPEED TRAINING (CLEAN & EFFICIENT) */}
         {activeSubTab === 'speed' && (
           <div className="bg-[#15151D] border border-white/5 rounded-2xl p-3.5 sm:p-5 shadow-xl space-y-3">
-            {/* Prominent BPM Display */}
             <div className="flex flex-col items-center justify-center pt-1 pb-1">
               <div className="text-6xl sm:text-8xl font-black font-gx-num tracking-tight text-white leading-none">
                 {speedProgress.isActive ? speedProgress.currentBpm : speedConfig.startBpm}
@@ -2182,14 +2151,12 @@ export default function App() {
               </div>
             </div>
 
-            {/* Pure Dot Visualizer */}
             {renderDotVisualiser(
               stepSubdiv,
               speedProgress.isActive ? speedProgress.currentBpm : speedConfig.startBpm,
               speedConfig.timeSignature.beats
             )}
 
-            {/* Live Status HUD */}
             <div className="bg-[#101016] p-2.5 sm:p-3 rounded-xl border border-white/5 flex items-center justify-between flex-wrap gap-2 text-xs">
               <div className="text-[#92929F] flex items-center gap-1.5 sm:gap-2 text-[11px] sm:text-xs">
                 <span>Target: <strong className="text-white font-mono">{speedConfig.endBpm}</strong></span>
@@ -2218,7 +2185,6 @@ export default function App() {
               </div>
             </div>
 
-            {/* Controls */}
             <div className="flex items-center justify-center gap-2 py-1 flex-wrap">
               {!speedProgress.isActive ? (
                 <button
@@ -2268,63 +2234,11 @@ export default function App() {
                 RESET
               </button>
             </div>
-
-            {/* Click-to-Expand Settings Drawer */}
-            {isSettingsOpen && (
-              <div className="pt-3 border-t border-white/5 space-y-3 animate-in fade-in duration-200">
-                <div className="flex items-center justify-between">
-                  <span className="text-[11px] uppercase font-semibold text-[#92929F]">Speed Configuration</span>
-                  <div className="flex items-center gap-2">
-                    <span className="text-[10px] text-[#92929F] uppercase font-semibold">Count In:</span>
-                    <button
-                      onClick={() => setSpeedConfig(prev => ({ ...prev, countInEnabled: !prev.countInEnabled }))}
-                      className="px-2 py-0.5 rounded text-[10px] font-bold transition-all"
-                      style={{
-                        backgroundColor: speedConfig.countInEnabled ? currentTheme.primary : '#1B1B25',
-                        color: speedConfig.countInEnabled ? '#FFFFFF' : '#92929F'
-                      }}
-                    >
-                      {speedConfig.countInEnabled ? 'ON' : 'OFF'}
-                    </button>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                  {[
-                    { label: 'Start BPM', key: 'startBpm', min: 40, max: 260 },
-                    { label: 'End BPM', key: 'endBpm', min: 50, max: 300 },
-                    { label: 'Increment', key: 'bpmIncrement', min: 1, max: 20 },
-                    { label: 'Bars / Loop', key: 'barsPerLoop', min: 1, max: 16 },
-                    { label: 'Loops / Inc', key: 'loopsBeforeIncrease', min: 1, max: 8 },
-                    { label: 'Init Count In', key: 'initialCountIn', min: 1, max: 8 },
-                    { label: 'Inc Count In', key: 'speedIncreaseCountIn', min: 1, max: 8 },
-                  ].map(item => (
-                    <div key={item.key} className="bg-[#101016] p-2 rounded-lg border border-white/5">
-                      <div className="flex items-center justify-between text-[10px] text-[#92929F] mb-1">
-                        <span className="truncate pr-1">{item.label}</span>
-                        <span className="font-mono font-bold" style={{ color: currentTheme.primary }}>{speedConfig[item.key]}</span>
-                      </div>
-                      <input
-                        type="range"
-                        min={item.min}
-                        max={item.max}
-                        value={speedConfig[item.key]}
-                        onChange={(e) => setSpeedConfig({ ...speedConfig, [item.key]: Number(e.target.value) })}
-                        style={{ accentColor: currentTheme.primary }}
-                        className="w-full h-1.5 bg-[#1B1B25] rounded cursor-pointer"
-                      />
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
           </div>
         )}
 
-        {/* 3. RATIOS TRAINING (CLEAN & EFFICIENT) */}
         {activeSubTab === 'ratios' && (
           <div className="bg-[#15151D] border border-white/5 rounded-2xl p-3.5 sm:p-5 shadow-xl space-y-3">
-            {/* Prominent BPM Display */}
             <div className="flex flex-col items-center justify-center pt-1 pb-1">
               <div className="text-6xl sm:text-8xl font-black font-gx-num tracking-tight text-white leading-none">
                 {ratiosConfig.bpm}
@@ -2334,14 +2248,12 @@ export default function App() {
               </div>
             </div>
 
-            {/* Pure Dot Visualizer */}
             {renderDotVisualiser(
               ratiosProgress.isActive ? ratiosProgress.currentSubdivision : ratiosConfig.loop1,
               ratiosConfig.bpm,
               ratiosConfig.numberOfBeats
             )}
 
-            {/* Live Cycle HUD */}
             <div className="bg-[#101016] p-2.5 sm:p-3 rounded-xl border border-white/5 flex items-center justify-between flex-wrap gap-2 text-xs">
               <div>
                 <div className="font-mono text-white flex items-center gap-1.5 font-bold text-[11px] sm:text-xs">
@@ -2369,7 +2281,6 @@ export default function App() {
               )}
             </div>
 
-            {/* Controls Row */}
             <div className="flex items-center justify-center gap-1.5 sm:gap-2.5 w-full max-w-sm mx-auto">
               <button
                 onClick={() => {
@@ -2452,82 +2363,220 @@ export default function App() {
                 +5
               </button>
             </div>
-
-            {/* Click-to-Expand Settings Drawer */}
-            {isSettingsOpen && (
-              <div className="pt-3 border-t border-white/5 space-y-3 animate-in fade-in duration-200">
-                <div className="flex items-center justify-between flex-wrap gap-2 text-xs">
-                  <div className="flex items-center gap-2">
-                    <span className="text-[10px] text-[#92929F] uppercase font-semibold">Ratio:</span>
-                    <button
-                      onClick={() => setRatiosConfig(prev => ({ ...prev, subdivisionRatioEnabled: !prev.subdivisionRatioEnabled }))}
-                      className="px-2 py-0.5 rounded text-[10px] font-bold transition-all"
-                      style={{
-                        backgroundColor: ratiosConfig.subdivisionRatioEnabled ? currentTheme.primary : '#1B1B25',
-                        color: ratiosConfig.subdivisionRatioEnabled ? '#FFFFFF' : '#92929F'
-                      }}
-                    >
-                      {ratiosConfig.subdivisionRatioEnabled ? 'ON' : 'OFF'}
-                    </button>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-[10px] text-[#92929F] uppercase font-semibold">Beats/Loop:</span>
-                    <span className="font-mono font-bold" style={{ color: currentTheme.primary }}>{ratiosConfig.numberOfBeats}</span>
-                    <input
-                      type="range"
-                      min="1"
-                      max="12"
-                      value={ratiosConfig.numberOfBeats}
-                      onChange={(e) => setRatiosConfig({ ...ratiosConfig, numberOfBeats: Number(e.target.value) })}
-                      style={{ accentColor: currentTheme.primary }}
-                      className="w-16 sm:w-20 h-1.5 bg-[#1B1B25] rounded cursor-pointer"
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                  <div className="bg-[#101016] p-2.5 rounded-lg border border-white/5">
-                    <label className="text-[10px] font-semibold text-[#92929F] uppercase block mb-1">Loop 1</label>
-                    <select
-                      value={ratiosConfig.loop1.id}
-                      onChange={(e) => {
-                        const found = SUBDIVISIONS.find(s => s.id === e.target.value) || SUBDIVISIONS[1];
-                        setRatiosConfig({ ...ratiosConfig, loop1: found });
-                        if (ratiosProgress.isActive && ratiosProgress.activeLoop === 1) {
-                          audioEngine.setSubdivision(found);
-                        }
-                      }}
-                      className="w-full bg-[#1B1B25] border border-white/10 rounded-lg px-2.5 py-1.5 text-xs text-white"
-                    >
-                      {SUBDIVISIONS.map(s => <option key={s.id} value={s.id}>{s.name} ({s.dotsPerBeat})</option>)}
-                    </select>
-                  </div>
-
-                  <div className="bg-[#101016] p-2.5 rounded-lg border border-white/5">
-                    <label className="text-[10px] font-semibold text-[#92929F] uppercase block mb-1">Loop 2</label>
-                    <select
-                      disabled={!ratiosConfig.subdivisionRatioEnabled}
-                      value={ratiosConfig.loop2.id}
-                      onChange={(e) => {
-                        const found = SUBDIVISIONS.find(s => s.id === e.target.value) || SUBDIVISIONS[3];
-                        setRatiosConfig({ ...ratiosConfig, loop2: found });
-                        if (ratiosProgress.isActive && ratiosProgress.activeLoop === 2) {
-                          audioEngine.setSubdivision(found);
-                        }
-                      }}
-                      className="w-full bg-[#1B1B25] border border-white/10 rounded-lg px-2.5 py-1.5 text-xs text-white disabled:opacity-40"
-                    >
-                      {SUBDIVISIONS.map(s => <option key={s.id} value={s.id}>{s.name} ({s.dotsPerBeat})</option>)}
-                    </select>
-                  </div>
-                </div>
-              </div>
-            )}
           </div>
         )}
       </div>
     );
   };
+
+  // ==========================================================================
+  // MANDATORY ENTRY SCREEN: PROFILE GATEWAY & PIN AUTHENTICATION LOCK
+  // ==========================================================================
+  if (!isAuthenticated) {
+    return (
+      <div
+        className="min-h-screen text-[#FFFFFF] flex flex-col items-center justify-center p-4 relative overflow-hidden font-gx-body antialiased select-none"
+        style={{
+          backgroundColor: '#08080C',
+          backgroundImage: `
+            radial-gradient(circle at 50% 30%, ${currentTheme.glow} 0%, transparent 70%),
+            radial-gradient(circle at 80% 80%, ${currentTheme.glowSubtle} 0%, transparent 60%),
+            linear-gradient(rgba(255, 255, 255, 0.02) 1px, transparent 1px),
+            linear-gradient(90deg, rgba(255, 255, 255, 0.02) 1px, transparent 1px)
+          `,
+          backgroundSize: '100% 100%, 100% 100%, 32px 32px, 32px 32px'
+        }}
+      >
+        <style>{FONT_STYLES}</style>
+
+        {/* Ambient Top Glow Banner */}
+        <div
+          className="absolute -top-32 left-1/2 -translate-x-1/2 w-[550px] h-64 rounded-full pointer-events-none blur-3xl opacity-30"
+          style={{ backgroundColor: currentTheme.primary }}
+        />
+
+        <div className="max-w-md w-full relative z-10 animate-in fade-in zoom-in-95 duration-300">
+          {/* Studio Brand Header */}
+          <div className="text-center mb-6">
+            <div
+              className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-3 shadow-2xl transition-transform hover:scale-105"
+              style={{
+                backgroundColor: currentTheme.primary,
+                boxShadow: `0 0 30px ${currentTheme.glow}`
+              }}
+            >
+              <Music className="w-8 h-8 text-white stroke-[2.2]" />
+            </div>
+
+            <h1 className="text-xl sm:text-2xl font-black tracking-tight text-white font-gx-display uppercase">
+              Wannabe Guitarist's Studio
+            </h1>
+            <p className="text-xs text-[#92929F] mt-1 font-gx-display flex items-center justify-center gap-1.5 font-semibold">
+              <Lock className="w-3.5 h-3.5 text-[#10B981]" />
+              Secure Profile Gateway &bull; Opera GX Audio Engine
+            </p>
+          </div>
+
+          {/* Main Card */}
+          <div className="bg-[#15151D]/90 backdrop-blur-xl border border-white/10 rounded-3xl p-5 sm:p-7 shadow-2xl relative overflow-hidden">
+            <div className="text-center mb-5">
+              <span className="text-[10px] font-mono font-bold tracking-widest uppercase text-[#92929F] block mb-1">
+                STEP 1: SELECT YOUR PROFILE
+              </span>
+              <p className="text-xs text-[#92929F]">
+                Pick your private workspace to load your personal tempos, routines, and video history.
+              </p>
+            </div>
+
+            {/* Profile Selection Grid */}
+            <div className="grid grid-cols-2 gap-3 mb-5">
+              {Object.keys(userProfiles).map(uid => {
+                const prof = userProfiles[uid];
+                const isSelected = selectedLoginUser === uid;
+                const isUserAdmin = uid === 'user1';
+
+                return (
+                  <button
+                    key={uid}
+                    type="button"
+                    onClick={() => {
+                      setSelectedLoginUser(uid);
+                      setLoginErrorMessage('');
+                      setLoginPinInput('');
+                      audioEngine.playUiSound('step');
+                    }}
+                    className={`p-3.5 rounded-2xl border text-left transition-all relative flex flex-col justify-between ${
+                      isSelected
+                        ? 'bg-[#1B1B25] border-white/40 shadow-xl'
+                        : 'bg-[#101016]/90 border-white/5 opacity-80 hover:opacity-100 hover:border-white/15'
+                    }`}
+                    style={{
+                      borderColor: isSelected ? currentTheme.primary : undefined,
+                      boxShadow: isSelected ? `0 0 20px ${currentTheme.glowSubtle}` : 'none'
+                    }}
+                  >
+                    <div className="flex items-center justify-between mb-2">
+                      <div
+                        className="w-7 h-7 rounded-xl flex items-center justify-center font-bold text-xs"
+                        style={{
+                          backgroundColor: isUserAdmin ? currentTheme.accentBg : '#3B82F625',
+                          color: isUserAdmin ? currentTheme.primary : '#3B82F6'
+                        }}
+                      >
+                        {isUserAdmin ? 'P1' : 'P2'}
+                      </div>
+                      {prof.pin ? (
+                        <Lock className="w-3.5 h-3.5 text-[#10B981]" title="PIN Secured" />
+                      ) : (
+                        <Unlock className="w-3.5 h-3.5 text-[#92929F]" title="Open Access" />
+                      )}
+                    </div>
+
+                    <div>
+                      <span className="text-[9px] font-mono font-bold uppercase tracking-wider block" style={{ color: isUserAdmin ? currentTheme.primary : '#92929F' }}>
+                        {isUserAdmin ? '★ MASTER ADMIN' : 'GUITARIST'}
+                      </span>
+                      <h3 className="text-xs sm:text-sm font-bold text-white font-mono truncate">
+                        {prof.name}
+                      </h3>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Credential PIN Input Form */}
+            {selectedLoginUser && (
+              <form onSubmit={handleGatewayLogin} className="space-y-4 pt-3 border-t border-white/5 animate-in fade-in duration-200">
+                <div>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="text-[11px] font-bold uppercase font-mono tracking-wider text-[#92929F]">
+                      {userProfiles[selectedLoginUser]?.pin ? 'Enter Access PIN' : 'Passwordless Profile'}
+                    </label>
+                    <span className="text-[10px] text-[#92929F] font-mono">
+                      Target: <strong className="text-white">{userProfiles[selectedLoginUser]?.name}</strong>
+                    </span>
+                  </div>
+
+                  {userProfiles[selectedLoginUser]?.pin ? (
+                    <div className="relative">
+                      <input
+                        type="password"
+                        autoFocus
+                        maxLength={6}
+                        placeholder="••••"
+                        value={loginPinInput}
+                        onChange={(e) => setLoginPinInput(e.target.value)}
+                        className="w-full bg-[#101016] border border-white/10 rounded-2xl py-3 text-center text-xl tracking-[0.4em] font-mono text-white focus:outline-none transition-all shadow-inner"
+                        style={{
+                          borderColor: loginErrorMessage ? '#EF4444' : currentTheme.borderActive
+                        }}
+                      />
+                      <KeyRound className="w-4 h-4 text-[#92929F] absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none" />
+                    </div>
+                  ) : (
+                    <div className="bg-[#101016] p-3 rounded-2xl border border-white/5 text-center text-xs text-[#10B981] font-mono">
+                      ✓ No PIN required for this profile. Click Enter Studio below.
+                    </div>
+                  )}
+                </div>
+
+                {/* Feedback Message */}
+                {loginErrorMessage && (
+                  <div className="bg-[#EF4444]/15 border border-[#EF4444]/30 text-[#EF4444] text-xs py-2 px-3 rounded-xl font-mono font-bold text-center flex items-center justify-center gap-1.5 animate-bounce">
+                    <ShieldAlert className="w-4 h-4 flex-shrink-0" />
+                    <span>{loginErrorMessage}</span>
+                  </div>
+                )}
+
+                {/* Quick Hint */}
+                {selectedLoginUser === 'user1' && (
+                  <p className="text-[10px] text-[#92929F] text-center font-mono italic">
+                    Hint: Default Master Admin PIN is <code className="text-white font-bold not-italic">7779</code>
+                  </p>
+                )}
+                {selectedLoginUser === 'user2' && (
+                  <p className="text-[10px] text-[#92929F] text-center font-mono italic">
+                    Hint: Default Guitarist 2 PIN is <code className="text-white font-bold not-italic">1111</code>
+                  </p>
+                )}
+
+                <button
+                  type="submit"
+                  className="w-full py-3.5 rounded-2xl text-white font-extrabold text-xs sm:text-sm font-gx-display tracking-wider uppercase transition-all active:scale-95 flex items-center justify-center gap-2 shadow-2xl"
+                  style={{
+                    backgroundColor: currentTheme.primary,
+                    boxShadow: `0 0 25px ${currentTheme.glow}`
+                  }}
+                >
+                  <Unlock className="w-4 h-4 stroke-[2.5]" />
+                  Enter Guitarist's Studio
+                </button>
+              </form>
+            )}
+          </div>
+
+          {/* Theme Palette Bar on Lock Screen */}
+          <div className="flex items-center justify-center gap-2 mt-5">
+            <span className="text-[10px] uppercase font-bold text-[#92929F] font-mono mr-1">Theme:</span>
+            {Object.values(GX_THEMES).map(t => (
+              <button
+                key={t.id}
+                onClick={() => changeTheme(t.id)}
+                className="w-5 h-5 rounded-full transition-transform hover:scale-125"
+                style={{
+                  backgroundColor: t.primary,
+                  boxShadow: currentThemeKey === t.id ? `0 0 10px ${t.primary}` : 'none',
+                  border: currentThemeKey === t.id ? '2px solid #FFFFFF' : 'none'
+                }}
+                title={t.name}
+              />
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div
@@ -2545,7 +2594,7 @@ export default function App() {
     >
       <style>{FONT_STYLES}</style>
 
-      {/* Top Header / Sticky Nav - Opera GX Styled */}
+      {/* Top Header / Sticky Nav */}
       <header className="sticky top-0 z-50 bg-[#101016]/90 backdrop-blur-md border-b border-white/5 px-3 sm:px-6 lg:px-8 py-2.5 sm:py-3.5 flex items-center justify-between shadow-2xl">
         <div className="flex items-center gap-2.5 sm:gap-3">
           <div
@@ -2618,7 +2667,7 @@ export default function App() {
           })}
         </nav>
 
-        {/* Theme Picker, Profile Switcher & Global Fast Metronome Pill */}
+        {/* Profile Switcher, Sync & GX Themes */}
         <div className="flex items-center gap-2">
           {/* User Profile Switcher Button with Lock Status */}
           <button
@@ -2645,6 +2694,16 @@ export default function App() {
             )}
           </button>
 
+          {/* Quick Lock / Sign Out Button back to Lock Gateway */}
+          <button
+            onClick={handleLockStudio}
+            className="p-1.5 sm:px-2.5 sm:py-1.5 rounded-xl bg-[#15151D] border border-white/10 hover:border-[#EF4444]/40 hover:text-[#EF4444] text-[#92929F] flex items-center gap-1.5 transition-all text-xs"
+            title="Lock Studio (Sign Out)"
+          >
+            <LogOut className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline text-[11px] font-gx-display font-bold">Lock</span>
+          </button>
+
           {/* Cloud Sync Button */}
           <button
             onClick={() => setIsSyncModalOpen(true)}
@@ -2657,7 +2716,6 @@ export default function App() {
             </span>
           </button>
 
-          {/* GX Theme Selector Popover Button */}
           <div className="relative">
             <button
               onClick={() => setIsThemePickerOpen(!isThemePickerOpen)}
@@ -2728,9 +2786,7 @@ export default function App() {
 
       {/* Main Content Area */}
       <main className="flex-1 max-w-7xl w-full mx-auto p-3 sm:p-6 lg:p-8 relative z-10">
-        {/* ============================================================== */}
         {/* MODULE 1: DAILY PRACTICE DASHBOARD */}
-        {/* ============================================================== */}
         {activeTab === 'daily' && (
           <div className="space-y-4 sm:space-y-6">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-3 pb-1">
@@ -2742,7 +2798,6 @@ export default function App() {
                 <p className="text-xs sm:text-sm text-[#92929F]">4-Step Mastery Pipeline &bull; Audio engine synchronized</p>
               </div>
 
-              {/* Progress Summary Pill */}
               <div className="flex items-center justify-between sm:justify-start gap-2 bg-[#15151D] border border-white/5 px-3.5 py-1.5 sm:py-2 rounded-xl text-xs shadow-lg">
                 <span className="text-[#92929F]">Progress:</span>
                 <span className="font-bold font-mono" style={{ color: currentTheme.primary }}>
@@ -2756,7 +2811,6 @@ export default function App() {
               </div>
             </div>
 
-            {/* Exercise Selector & Quick Benchmark Loader */}
             <div className="bg-[#15151D] border border-white/5 p-3.5 sm:p-4 rounded-2xl flex flex-col md:flex-row md:items-center justify-between gap-3 shadow-xl">
               <div className="flex items-center gap-2.5">
                 <div
@@ -2813,7 +2867,7 @@ export default function App() {
               </div>
             </div>
 
-            {/* STEP 1: COMFORT ZONE WARMUP */}
+            {/* STEP 1 */}
             <div className="bg-[#15151D] border border-white/5 rounded-2xl p-4 sm:p-5 shadow-xl transition-all">
               <div
                 onClick={() => setCurrentStepOpen(currentStepOpen === 1 ? 0 : 1)}
@@ -2841,7 +2895,6 @@ export default function App() {
 
               {currentStepOpen === 1 && (
                 <div className="mt-4 pt-4 border-t border-white/5 space-y-4">
-                  {/* Timer Controls */}
                   <div className="flex items-center justify-between flex-wrap gap-2 bg-[#101016] p-3 rounded-xl border border-white/5">
                     <div className="flex items-center gap-2">
                       <Clock className="w-4 h-4 text-[#10B981]" />
@@ -2884,7 +2937,6 @@ export default function App() {
                     </div>
                   </div>
 
-                  {/* Focus Areas */}
                   <div>
                     <label className="text-[10px] uppercase font-semibold text-[#92929F] mb-1.5 block">Focus Areas</label>
                     <div className="flex flex-wrap gap-1.5">
@@ -2907,13 +2959,12 @@ export default function App() {
                     </div>
                   </div>
 
-                  {/* Embedded Step Metronome Suite */}
                   {renderStepMetronomeSuite(1, practiceSession.step1.bpm, step1SubTab, setStep1SubTab, '#10B981')}
                 </div>
               )}
             </div>
 
-            {/* STEP 2: EDGE OF ABILITY */}
+            {/* STEP 2 */}
             <div className="bg-[#15151D] border border-white/5 rounded-2xl p-4 sm:p-5 shadow-xl transition-all">
               <div
                 onClick={() => setCurrentStepOpen(currentStepOpen === 2 ? 0 : 2)}
@@ -2941,7 +2992,6 @@ export default function App() {
 
               {currentStepOpen === 2 && (
                 <div className="mt-4 pt-4 border-t border-white/5 space-y-4">
-                  {/* Timer Controls */}
                   <div className="flex items-center justify-between flex-wrap gap-2 bg-[#101016] p-3 rounded-xl border border-white/5">
                     <div className="flex items-center gap-2">
                       <Clock className="w-4 h-4 text-[#3B82F6]" />
@@ -2984,7 +3034,6 @@ export default function App() {
                     </div>
                   </div>
 
-                  {/* Focus Areas */}
                   <div>
                     <label className="text-[10px] uppercase font-semibold text-[#92929F] mb-1.5 block">Focus Areas</label>
                     <div className="flex flex-wrap gap-1.5">
@@ -3007,13 +3056,12 @@ export default function App() {
                     </div>
                   </div>
 
-                  {/* Embedded Step Metronome Suite */}
                   {renderStepMetronomeSuite(2, practiceSession.step2.bpm, step2SubTab, setStep2SubTab, '#3B82F6')}
                 </div>
               )}
             </div>
 
-            {/* STEP 3: SPEED BURSTS */}
+            {/* STEP 3 */}
             <div className="bg-[#15151D] border border-white/5 rounded-2xl p-4 sm:p-5 shadow-xl transition-all">
               <div
                 onClick={() => setCurrentStepOpen(currentStepOpen === 3 ? 0 : 3)}
@@ -3041,7 +3089,6 @@ export default function App() {
 
               {currentStepOpen === 3 && (
                 <div className="mt-4 pt-4 border-t border-white/5 space-y-4">
-                  {/* Timer Controls */}
                   <div className="flex items-center justify-between flex-wrap gap-2 bg-[#101016] p-3 rounded-xl border border-white/5">
                     <div className="flex items-center gap-2">
                       <Clock className="w-4 h-4 text-[#EF4444]" />
@@ -3084,7 +3131,6 @@ export default function App() {
                     </div>
                   </div>
 
-                  {/* Quick Burst Trigger Bar */}
                   <div className="bg-[#101016] p-3 rounded-xl border border-white/5 flex items-center justify-between flex-wrap gap-2">
                     <div className="flex items-center gap-2">
                       <Zap className="w-4 h-4 text-[#EF4444]" />
@@ -3112,7 +3158,6 @@ export default function App() {
                     </div>
                   </div>
 
-                  {/* Focus Areas */}
                   <div>
                     <label className="text-[10px] uppercase font-semibold text-[#92929F] mb-1.5 block">Focus Areas</label>
                     <div className="flex flex-wrap gap-1.5">
@@ -3135,13 +3180,12 @@ export default function App() {
                     </div>
                   </div>
 
-                  {/* Embedded Step Metronome Suite */}
                   {renderStepMetronomeSuite(3, practiceSession.step3.bpm, step3SubTab, setStep3SubTab, '#EF4444')}
                 </div>
               )}
             </div>
 
-            {/* STEP 4: GAMIFY & LOG PROGRESS */}
+            {/* STEP 4 */}
             <div className="bg-[#15151D] border border-white/5 rounded-2xl p-4 sm:p-5 shadow-xl transition-all">
               <div
                 onClick={() => setCurrentStepOpen(currentStepOpen === 4 ? 0 : 4)}
@@ -3206,9 +3250,7 @@ export default function App() {
           </div>
         )}
 
-        {/* ============================================================== */}
         {/* MODULE 2: METRONOME TAB */}
-        {/* ============================================================== */}
         {activeTab === 'metronome' && (
           <div className="space-y-4 sm:space-y-6">
             <div className="flex items-center justify-between pb-1 flex-wrap gap-2">
@@ -3220,7 +3262,6 @@ export default function App() {
                 <p className="text-xs sm:text-sm text-[#92929F]">Zero-drift Web Audio lookahead engine &bull; Dynamic subdivision visualizer</p>
               </div>
 
-              {/* Mode Selector */}
               <div className="flex items-center gap-1 bg-[#15151D] p-1 rounded-xl border border-white/5">
                 {[
                   { id: 'standard', label: 'Standard' },
@@ -3246,16 +3287,14 @@ export default function App() {
               </div>
             </div>
 
-            {/* A. Standard Mode */}
+            {/* Standard Metronome */}
             {activeMetronomeMode === 'standard' && (
               <div className="bg-[#15151D] border border-white/5 rounded-2xl p-4 sm:p-6 shadow-2xl relative overflow-hidden">
-                {/* Radial Cyber Ambient Glow */}
                 <div
                   className="absolute -top-24 left-1/2 -translate-x-1/2 w-96 h-48 rounded-full pointer-events-none blur-3xl opacity-20"
                   style={{ backgroundColor: currentTheme.primary }}
                 />
 
-                {/* 1. Large BPM Display */}
                 <div className="flex flex-col items-center justify-center pt-1 pb-1 relative z-10">
                   <div className="text-7xl sm:text-9xl font-black font-gx-num tracking-tight text-white mb-0.5 sm:mb-1 leading-none select-none drop-shadow-[0_4px_16px_rgba(0,0,0,0.6)]">
                     {bpm}
@@ -3265,12 +3304,9 @@ export default function App() {
                   </div>
                 </div>
 
-                {/* 2. Pure Dot-Based Visualizer (Directly Below BPM) */}
                 {renderDotVisualiser(selectedSubdivision, bpm)}
 
-                {/* 3. Settings & Interactives (Below Visualizer) */}
                 <div className="flex flex-col items-center justify-center pt-2 sm:pt-4 relative z-10">
-                  {/* Steppers & Start/Stop */}
                   <div className="flex items-center gap-1.5 sm:gap-3 w-full max-w-sm justify-center">
                     <button
                       onClick={() => { const val = Math.max(30, bpm - 5); setBpm(val); audioEngine.setBpm(val); audioEngine.playUiSound('step'); }}
@@ -3310,7 +3346,6 @@ export default function App() {
                     </button>
                   </div>
 
-                  {/* QUICK BPM PRESET DIAL */}
                   <div className="flex items-center justify-center gap-1.5 mt-3 flex-wrap">
                     {[60, 80, 100, 120, 140, 160].map(preset => (
                       <button
@@ -3335,7 +3370,6 @@ export default function App() {
                     ))}
                   </div>
 
-                  {/* Slider, Tap Tempo, Sound Engine Profile & Volume */}
                   <div className="w-full max-w-md mt-4 sm:mt-5 space-y-3 sm:space-y-4">
                     <input
                       type="range"
@@ -3360,7 +3394,6 @@ export default function App() {
                         TAP TEMPO
                       </button>
 
-                      {/* Sound Type Selector Dropdown */}
                       <div className="flex items-center gap-1 bg-[#101016] px-2.5 py-1 rounded-xl border border-white/5">
                         <span className="text-[10px] text-[#92929F] font-semibold uppercase hidden sm:inline font-gx-display">Click:</span>
                         <select
@@ -3376,7 +3409,6 @@ export default function App() {
                         </select>
                       </div>
 
-                      {/* Volume */}
                       <div className="flex items-center gap-2">
                         <Volume2 className="w-4 h-4 text-[#92929F]" />
                         <input
@@ -3398,7 +3430,6 @@ export default function App() {
                   </div>
                 </div>
 
-                {/* Subdivisions & Time Signature Row */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-5 sm:mt-6 pt-4 sm:pt-5 border-t border-white/5 relative z-10">
                   <div>
                     <label className="text-[10px] sm:text-xs uppercase font-semibold text-[#92929F] mb-2 block font-gx-display">Rhythmic Subdivision</label>
@@ -3459,7 +3490,7 @@ export default function App() {
               </div>
             )}
 
-            {/* B. Speed Training Mode */}
+            {/* Speed Training */}
             {activeMetronomeMode === 'speed' && (
               <div className="bg-[#15151D] border border-white/5 rounded-2xl p-4 sm:p-6 shadow-2xl space-y-4">
                 <div className="flex flex-col items-center justify-center pt-1 pb-1">
@@ -3477,7 +3508,6 @@ export default function App() {
                   speedConfig.timeSignature.beats
                 )}
 
-                {/* HUD Panel */}
                 <div className="bg-[#101016] p-3 rounded-xl border border-white/5 flex items-center justify-between flex-wrap gap-2 text-xs">
                   <div className="text-[#92929F] flex items-center gap-2 font-gx-num">
                     <span>Target: <strong className="text-white font-bold">{speedConfig.endBpm}</strong></span>
@@ -3506,7 +3536,6 @@ export default function App() {
                   </div>
                 </div>
 
-                {/* Controls */}
                 <div className="flex items-center justify-center gap-2 py-1 flex-wrap">
                   {!speedProgress.isActive ? (
                     <button
@@ -3557,7 +3586,6 @@ export default function App() {
                   </button>
                 </div>
 
-                {/* Speed Training Configuration Controls */}
                 <div className="pt-4 border-t border-white/5 space-y-4">
                   <div className="flex items-center justify-between flex-wrap gap-2 pb-2 border-b border-white/5">
                     <div>
@@ -3654,7 +3682,7 @@ export default function App() {
               </div>
             )}
 
-            {/* C. Ratios Training Mode */}
+            {/* Ratios Training */}
             {activeMetronomeMode === 'ratios' && (
               <div className="bg-[#15151D] border border-white/5 rounded-2xl p-4 sm:p-6 shadow-2xl space-y-4">
                 <div className="flex flex-col items-center justify-center pt-1 pb-1">
@@ -3672,7 +3700,6 @@ export default function App() {
                   ratiosConfig.numberOfBeats
                 )}
 
-                {/* Status HUD */}
                 <div className="bg-[#101016] p-3 rounded-xl border border-white/5 flex items-center justify-between flex-wrap gap-2 text-xs">
                   <div>
                     <div className="font-gx-display text-white flex items-center gap-1.5 font-bold text-xs">
@@ -3687,7 +3714,6 @@ export default function App() {
                   </div>
                 </div>
 
-                {/* Controls */}
                 <div className="flex items-center justify-center gap-2 py-1">
                   {!ratiosProgress.isActive ? (
                     <button
@@ -3712,7 +3738,6 @@ export default function App() {
                   )}
                 </div>
 
-                {/* Ratios Training Configuration Controls */}
                 <div className="pt-4 border-t border-white/5 space-y-4">
                   <div className="flex items-center justify-between flex-wrap gap-2 pb-2 border-b border-white/5">
                     <div>
@@ -3725,7 +3750,7 @@ export default function App() {
                         <span className="text-[10px] font-semibold text-[#92929F] uppercase">Count In:</span>
                         <button
                           onClick={() => setRatiosConfig(prev => ({ ...prev, countInEnabled: !prev.countInEnabled }))}
-                          className="px-2 py-0.5 rounded text-[11px] font-bold"
+                          className="px-2.5 py-0.5 rounded text-[11px] font-bold"
                           style={{
                             backgroundColor: ratiosConfig.countInEnabled ? currentTheme.primary : '#1B1B25',
                             color: ratiosConfig.countInEnabled ? '#FFFFFF' : '#92929F'
@@ -3739,7 +3764,7 @@ export default function App() {
                         <span className="text-[10px] font-semibold text-[#92929F] uppercase">Ratio:</span>
                         <button
                           onClick={() => setRatiosConfig(prev => ({ ...prev, subdivisionRatioEnabled: !prev.subdivisionRatioEnabled }))}
-                          className="px-2 py-0.5 rounded text-[11px] font-bold"
+                          className="px-2.5 py-0.5 rounded text-[11px] font-bold"
                           style={{
                             backgroundColor: ratiosConfig.subdivisionRatioEnabled ? currentTheme.primary : '#1B1B25',
                             color: ratiosConfig.subdivisionRatioEnabled ? '#FFFFFF' : '#92929F'
@@ -3824,9 +3849,7 @@ export default function App() {
           </div>
         )}
 
-        {/* ============================================================== */}
-        {/* MODULE 3: MY PROGRESS & INSIGHTS */}
-        {/* ============================================================== */}
+        {/* MODULE 3: MY PROGRESS */}
         {activeTab === 'progress' && (
           <div className="space-y-4 sm:space-y-6">
             <div>
@@ -3837,7 +3860,6 @@ export default function App() {
               <p className="text-xs sm:text-sm text-[#92929F]">Velocity tracking, speed benchmarks & technique distribution.</p>
             </div>
 
-            {/* KPI Cards */}
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
               <div className="bg-[#15151D] border border-white/5 p-4 rounded-2xl shadow-lg">
                 <span className="text-[10px] text-[#92929F] uppercase font-semibold">Total Practice Time</span>
@@ -3873,7 +3895,6 @@ export default function App() {
               </div>
             </div>
 
-            {/* Target BPM Gauges */}
             <div className="bg-[#15151D] border border-white/5 p-4 sm:p-6 rounded-2xl shadow-xl space-y-3">
               <h3 className="text-sm sm:text-base font-bold text-white font-mono flex items-center gap-2">
                 <Target className="w-4 h-4" style={{ color: currentTheme.primary }} />
@@ -3926,7 +3947,6 @@ export default function App() {
                   <span className="text-xs text-[#92929F] font-mono">Click any date to toggle completion status</span>
                 </div>
 
-                {/* Month Navigator Header */}
                 <div className="flex items-center gap-2 bg-[#101016] px-2.5 py-1.5 rounded-xl border border-white/5">
                   <button
                     onClick={() => setCurrentCalendarMonth(new Date(currentCalendarMonth.getFullYear(), currentCalendarMonth.getMonth() - 1, 1))}
@@ -3959,12 +3979,10 @@ export default function App() {
                       <div key={d} className="text-[#92929F] py-1 font-bold text-[10px] uppercase">{d}</div>
                     ))}
 
-                    {/* Empty padding slots before 1st of month */}
                     {Array.from({ length: firstDayIndex }).map((_, i) => (
                       <div key={`empty-${i}`} className="h-9 rounded-xl" />
                     ))}
 
-                    {/* Real month days */}
                     {Array.from({ length: totalDaysInMonth }).map((_, i) => {
                       const dayNum = i + 1;
                       const dateStr = `${monthPrefix}-${String(dayNum).padStart(2, '0')}`;
@@ -3996,9 +4014,7 @@ export default function App() {
           </div>
         )}
 
-        {/* ============================================================== */}
         {/* MODULE 4: EXERCISE LIBRARY */}
-        {/* ============================================================== */}
         {activeTab === 'library' && (
           <div className="space-y-4 sm:space-y-6">
             <div className="flex items-center justify-between pb-1 flex-wrap gap-2">
@@ -4086,9 +4102,7 @@ export default function App() {
           </div>
         )}
 
-        {/* ============================================================== */}
         {/* MODULE 5: PRACTICE HISTORY */}
-        {/* ============================================================== */}
         {activeTab === 'history' && (
           <div className="space-y-4 sm:space-y-6">
             <div className="flex items-center justify-between pb-1 flex-wrap gap-2">
@@ -4109,7 +4123,7 @@ export default function App() {
               </button>
             </div>
 
-            {/* Comparison with Previous Session Banner (Guaranteed Date-Sorted) */}
+            {/* Comparison with Previous Session */}
             {(() => {
               const chronologicalSessions = [...historySessions].sort(
                 (a, b) => (b.date || '').localeCompare(a.date || '') || (b.id || '').localeCompare(a.id || '')
@@ -4167,7 +4181,6 @@ export default function App() {
               );
             })()}
 
-            {/* Filter and Search Bar */}
             <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 bg-[#15151D] p-2.5 sm:p-3 rounded-2xl border border-white/5">
               <div className="flex-1 relative">
                 <input
@@ -4195,7 +4208,6 @@ export default function App() {
               </div>
             </div>
 
-            {/* Filtered & Sorted Sessions List */}
             {(() => {
               const filtered = historySessions.filter(s => {
                 if (!historySearchTerm.trim()) return true;
@@ -4264,7 +4276,6 @@ export default function App() {
                         </div>
                       </div>
 
-                      {/* 4 Metrics Strip */}
                       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3 bg-[#101016] p-2.5 sm:p-3 rounded-xl border border-white/5 mb-2.5 sm:mb-3">
                         <div>
                           <span className="text-[9px] sm:text-[10px] text-[#92929F] uppercase font-semibold">Comfort</span>
@@ -4293,9 +4304,7 @@ export default function App() {
           </div>
         )}
 
-        {/* ============================================================== */}
         {/* MODULE 6: MIRROR STUDIO */}
-        {/* ============================================================== */}
         {activeTab === 'mirror' && (
           <div className="space-y-4 sm:space-y-6">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
@@ -4473,7 +4482,6 @@ export default function App() {
               boxShadow: `0 0 40px ${currentTheme.glow}`
             }}
           >
-            {/* Ambient background glow */}
             <div
               className="absolute -top-16 left-1/2 -translate-x-1/2 w-48 h-24 rounded-full pointer-events-none blur-3xl opacity-30"
               style={{ backgroundColor: currentTheme.primary }}
@@ -4679,7 +4687,7 @@ export default function App() {
         </div>
       )}
 
-      {/* STEP 4 EXCLUSIVE: LOG PRACTICE SESSION MODAL */}
+      {/* LOG PRACTICE SESSION MODAL */}
       {isLogModalOpen && (
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4">
           <div className="bg-[#15151D] border border-white/10 rounded-2xl p-4 sm:p-6 max-w-lg w-full shadow-2xl space-y-3 sm:space-y-4 max-h-[85vh] overflow-y-auto pb-28 md:pb-6">
@@ -4767,7 +4775,6 @@ export default function App() {
               Two separate guitarists can use this app with 100% isolated history, library, and cloud sync. Lock your profile with a PIN so nobody else can mess up your progress!
             </p>
 
-            {/* Profile Cards */}
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 max-h-56 overflow-y-auto pr-1">
               {Object.keys(userProfiles).map(uid => {
                 const isSelected = activeUserId === uid;
@@ -4826,7 +4833,6 @@ export default function App() {
               })}
             </div>
 
-            {/* Admin Profile Creator Bar (Exclusive to Guitarist 1) */}
             {activeUserId === 'user1' && (
               <div className="bg-[#101016] p-3 rounded-xl border border-white/10 space-y-2.5">
                 <div className="flex items-center justify-between">
@@ -4894,7 +4900,6 @@ export default function App() {
               </div>
             )}
 
-            {/* Manage Active Profile Settings */}
             <div className="bg-[#101016] p-3 rounded-xl border border-white/5 space-y-3">
               <span className="text-[10px] uppercase font-bold text-[#92929F] block">
                 Manage {userProfiles[activeUserId]?.name}
@@ -4910,7 +4915,6 @@ export default function App() {
                 />
               </div>
 
-              {/* PIN Code Setup */}
               <div className="pt-2 border-t border-white/5 flex items-center justify-between">
                 <div>
                   <span className="text-xs font-bold text-white block">PIN Protection</span>
@@ -4996,10 +5000,10 @@ export default function App() {
         </div>
       )}
 
-      {/* PIN ENTRY MODAL (Prevents unauthorized profile switching) */}
+      {/* PIN ENTRY MODAL */}
       {isPinModalOpen && (
         <div className="fixed inset-0 z-50 bg-black/90 backdrop-blur-md flex items-center justify-center p-4">
-          <div className="bg-[#15151D] border-2 border-white/20 rounded-2xl p-6 max-w-xs w-full shadow-2xl text-center space-y-4 animate-in zoom-in-95">
+          <div className="bg-[#15151D] border-2 border-white/20 rounded-2xl p-6 max-xs w-full shadow-2xl text-center space-y-4 animate-in zoom-in-95">
             <div
               className="w-12 h-12 rounded-xl flex items-center justify-center mx-auto"
               style={{ backgroundColor: currentTheme.accentBg, color: currentTheme.primary }}
@@ -5050,7 +5054,7 @@ export default function App() {
         </div>
       )}
 
-      {/* CLOUD DEVICE SYNC MODAL (Connect Phone & PC per User) */}
+      {/* CLOUD DEVICE SYNC MODAL */}
       {isSyncModalOpen && (
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4">
           <div className="bg-[#15151D] border border-white/10 rounded-2xl p-5 sm:p-6 max-w-md w-full shadow-2xl space-y-4 animate-in fade-in zoom-in-95">
@@ -5101,7 +5105,6 @@ export default function App() {
               </div>
             </div>
 
-            {/* Status Feedback Banner */}
             {syncStatus === 'synced' && (
               <div className="bg-[#10B981]/15 border border-[#10B981]/30 text-[#10B981] px-3 py-2 rounded-xl text-xs font-mono font-bold text-center animate-in fade-in">
                 ✓ Cloud Synchronized Successfully!
