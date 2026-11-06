@@ -821,8 +821,13 @@ export default function App() {
   // CLOUD SYNC ENGINE (Synchronizes PC & Phone per isolated user)
   const syncToCloud = async (overrideData = null) => {
     const activeSyncKey = userProfiles[activeUserId]?.syncKey || syncKey;
-    if (!activeSyncKey) return;
+    if (!activeSyncKey) {
+      setSyncStatus('error');
+      return;
+    }
     setIsSyncing(true);
+    setSyncStatus(null);
+
     const payload = overrideData || {
       userId: activeUserId,
       profileName: userProfiles[activeUserId]?.name,
@@ -832,48 +837,108 @@ export default function App() {
       updatedAt: new Date().toISOString()
     };
 
+    const cleanKey = `wgs_${activeUserId}_${activeSyncKey.replace(/[^a-zA-Z0-9_-]/g, '')}`;
+
     try {
-      // Unique isolated key per user
-      const res = await fetch(`https://kvdb.io/AnCkW8L3xWbS2F45xeqYw5/${activeSyncKey}`, {
+      // Direct relay to ntfy publish cache (reliable, instant, CORS-enabled for iOS & Android)
+      const res = await fetch(`https://ntfy.sh/${cleanKey}`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'Title': `WGS Sync - ${userProfiles[activeUserId]?.name || activeUserId}`
+        },
         body: JSON.stringify(payload)
       });
+
       if (res.ok) {
         setSyncStatus('synced');
-        setTimeout(() => setSyncStatus(null), 3000);
+        setTimeout(() => setSyncStatus(null), 3500);
+        audioEngine.playUiSound('step');
+      } else {
+        throw new Error('Sync failed with status ' + res.status);
       }
-    } catch {
+    } catch (err) {
+      console.error('Cloud Sync Upload Error:', err);
       setSyncStatus('error');
+      setTimeout(() => setSyncStatus(null), 4000);
     } finally {
       setIsSyncing(false);
     }
   };
 
-  const fetchCloudData = async (keyToFetch = syncKey) => {
-    const activeSyncKey = keyToFetch || userProfiles[activeUserId]?.syncKey;
-    if (!activeSyncKey) return;
+  const fetchCloudData = async (keyToFetch = null) => {
+    const rawKey = keyToFetch || userProfiles[activeUserId]?.syncKey || syncKey;
+    if (!rawKey) {
+      setSyncStatus('error');
+      return;
+    }
     setIsSyncing(true);
+    setSyncStatus(null);
+
+    const cleanKey = `wgs_${activeUserId}_${rawKey.replace(/[^a-zA-Z0-9_-]/g, '')}`;
+
     try {
-      const res = await fetch(`https://kvdb.io/AnCkW8L3xWbS2F45xeqYw5/${activeSyncKey}`);
-      if (res.ok) {
-        const data = await res.json();
-        if (data.historySessions) {
-          setHistorySessions(data.historySessions);
-          localStorage.setItem(`gps_history_${activeUserId}`, JSON.stringify(data.historySessions));
+      // 1. First attempt: fetch from the ntfy JSON cache
+      let fetchedData = null;
+      try {
+        const ntfyRes = await fetch(`https://ntfy.sh/${cleanKey}/json?poll=1`);
+        if (ntfyRes.ok) {
+          const lines = (await ntfyRes.text()).trim().split('\n');
+          for (let i = lines.length - 1; i >= 0; i--) {
+            try {
+              const parsedLine = JSON.parse(lines[i]);
+              if (parsedLine.message) {
+                const inner = JSON.parse(parsedLine.message);
+                if (inner.historySessions || inner.exercises) {
+                  fetchedData = inner;
+                  break;
+                }
+              }
+            } catch {}
+          }
         }
-        if (data.exercises) {
-          setExercises(data.exercises);
-          localStorage.setItem(`gps_exercises_${activeUserId}`, JSON.stringify(data.exercises));
+      } catch {}
+
+      // 2. Fallback attempt: query restful-api bin
+      if (!fetchedData) {
+        const res = await fetch(`https://api.restful-api.dev/objects`);
+        if (res.ok) {
+          const list = await res.json();
+          const found = Array.isArray(list) ? list.filter(item => item.name === cleanKey).pop() : null;
+          if (found && found.data) {
+            fetchedData = found.data;
+          }
         }
-        if (data.practicedCalendarDays) {
-          setPracticedCalendarDays(data.practicedCalendarDays);
-          localStorage.setItem(`gps_practiced_dates_${activeUserId}`, JSON.stringify(data.practicedCalendarDays));
+      }
+
+      if (fetchedData) {
+        if (Array.isArray(fetchedData.historySessions)) {
+          setHistorySessions(fetchedData.historySessions);
+          try {
+            localStorage.setItem(`gps_history_${activeUserId}`, JSON.stringify(fetchedData.historySessions));
+          } catch {}
+        }
+        if (Array.isArray(fetchedData.exercises)) {
+          setExercises(fetchedData.exercises);
+          try {
+            localStorage.setItem(`gps_exercises_${activeUserId}`, JSON.stringify(fetchedData.exercises));
+          } catch {}
+        }
+        if (Array.isArray(fetchedData.practicedCalendarDays)) {
+          setPracticedCalendarDays(fetchedData.practicedCalendarDays);
+          try {
+            localStorage.setItem(`gps_practiced_dates_${activeUserId}`, JSON.stringify(fetchedData.practicedCalendarDays));
+          } catch {}
         }
         setSyncStatus('synced');
-        setTimeout(() => setSyncStatus(null), 3000);
+        setTimeout(() => setSyncStatus(null), 3500);
+        audioEngine.playUiSound('step');
+      } else {
+        setSyncStatus('not_found');
+        setTimeout(() => setSyncStatus(null), 4000);
       }
-    } catch {
+    } catch (err) {
+      console.error('Cloud Sync Fetch Error:', err);
       setSyncStatus('error');
     } finally {
       setIsSyncing(false);
@@ -4837,65 +4902,83 @@ export default function App() {
             </div>
 
             <p className="text-xs text-[#92929F] leading-relaxed">
-              This Sync Key connects <strong>{userProfiles[activeUserId]?.name}</strong> between your PC and phone. The second user has their own separate key and won't affect your sessions!
+              Use this Sync Key to connect <strong>{userProfiles[activeUserId]?.name}</strong> between your PC and phone. Both devices will share the exact same practice logs, tempos, and calendar!
             </p>
 
-            <div className="bg-[#101016] p-3 rounded-xl border border-white/10">
-              <span className="text-[10px] text-[#92929F] uppercase font-bold block mb-1">
+            <div className="bg-[#101016] p-3 rounded-xl border border-white/10 space-y-2">
+              <span className="text-[10px] text-[#92929F] uppercase font-bold block">
                 {userProfiles[activeUserId]?.name}'s Sync Key
               </span>
               <div className="flex items-center justify-between gap-2">
                 <input
                   type="text"
+                  placeholder="e.g. shred-master-77"
                   value={userProfiles[activeUserId]?.syncKey || ''}
                   onChange={(e) => {
-                    const keyVal = e.target.value.toLowerCase();
+                    const keyVal = e.target.value.toLowerCase().replace(/\s+/g, '-');
                     const updated = {
                       ...userProfiles,
                       [activeUserId]: { ...userProfiles[activeUserId], syncKey: keyVal }
                     };
                     saveUserProfiles(updated);
                   }}
-                  className="bg-transparent font-mono font-bold text-sm text-white focus:outline-none w-full"
+                  className="bg-[#1B1B25] border border-white/10 rounded-lg px-2.5 py-1.5 font-mono font-bold text-xs text-white focus:outline-none w-full"
                 />
                 <button
                   onClick={() => {
                     navigator.clipboard?.writeText(userProfiles[activeUserId]?.syncKey || '');
                     audioEngine.playUiSound('step');
                   }}
-                  className="px-2.5 py-1 rounded-lg bg-[#1B1B25] text-[11px] font-bold text-[#92929F] hover:text-white border border-white/5"
+                  className="px-3 py-1.5 rounded-lg bg-[#1B1B25] text-xs font-bold text-[#92929F] hover:text-white border border-white/5 whitespace-nowrap"
                 >
-                  Copy
+                  Copy Key
                 </button>
               </div>
             </div>
+
+            {/* Status Feedback Banner */}
+            {syncStatus === 'synced' && (
+              <div className="bg-[#10B981]/15 border border-[#10B981]/30 text-[#10B981] px-3 py-2 rounded-xl text-xs font-mono font-bold text-center animate-in fade-in">
+                ✓ Cloud Synchronized Successfully!
+              </div>
+            )}
+            {syncStatus === 'not_found' && (
+              <div className="bg-[#F59E0B]/15 border border-[#F59E0B]/30 text-[#F59E0B] px-3 py-2 rounded-xl text-xs font-mono font-bold text-center animate-in fade-in">
+                ⚠ No cloud data found for this key yet. Click "Upload to Cloud" on your PC first!
+              </div>
+            )}
+            {syncStatus === 'error' && (
+              <div className="bg-[#EF4444]/15 border border-[#EF4444]/30 text-[#EF4444] px-3 py-2 rounded-xl text-xs font-mono font-bold text-center animate-in fade-in">
+                ✕ Network error syncing. Please check your internet connection.
+              </div>
+            )}
 
             <div className="flex items-center gap-2 pt-1">
               <button
                 onClick={() => syncToCloud()}
                 disabled={isSyncing}
-                className="flex-1 py-2.5 rounded-xl bg-[#3B82F6] hover:bg-[#2563EB] text-white font-bold text-xs flex items-center justify-center gap-1.5 transition-all active:scale-95"
+                className="flex-1 py-2.5 rounded-xl bg-[#3B82F6] hover:bg-[#2563EB] text-white font-bold text-xs flex items-center justify-center gap-1.5 transition-all active:scale-95 disabled:opacity-50"
               >
                 <Upload className="w-3.5 h-3.5" />
-                Upload PC Data to Cloud
+                {isSyncing ? 'Uploading...' : 'Upload to Cloud'}
               </button>
 
               <button
                 onClick={() => fetchCloudData()}
                 disabled={isSyncing}
-                className="flex-1 py-2.5 rounded-xl bg-[#1B1B25] border border-white/10 hover:border-white/20 text-white font-bold text-xs flex items-center justify-center gap-1.5 transition-all active:scale-95"
+                className="flex-1 py-2.5 rounded-xl bg-[#1B1B25] border border-white/10 hover:border-white/20 text-white font-bold text-xs flex items-center justify-center gap-1.5 transition-all active:scale-95 disabled:opacity-50"
               >
                 <RefreshCcw className={`w-3.5 h-3.5 ${isSyncing ? 'animate-spin' : ''}`} />
-                Fetch on Phone
+                {isSyncing ? 'Fetching...' : 'Download to Phone'}
               </button>
             </div>
 
             <div className="pt-2 border-t border-white/5 text-[11px] text-[#92929F]">
-              <strong className="text-white">To sync this user on your phone:</strong>
+              <strong className="text-white">How to connect PC $\leftrightarrow$ Phone in 3 steps:</strong>
               <ol className="list-decimal list-inside space-y-1 mt-1 text-[10px] sm:text-[11px]">
-                <li>Copy the Sync Key above on your PC.</li>
-                <li>On your phone, switch to this user's profile and tap <strong>Sync</strong>.</li>
-                <li>Paste this exact key and tap <strong>Fetch on Phone</strong>.</li>
+                <li>On your <strong>PC</strong>: Click <strong>Sync</strong> $\rightarrow$ click <strong>Upload to Cloud</strong>.</li>
+                <li>Copy or type the exact same <strong>Sync Key</strong> on your phone.</li>
+                <li>On your <strong>Phone</strong>: Tap <strong>Download to Phone</strong>.</li>
               </ol>
             </div>
           </div>
