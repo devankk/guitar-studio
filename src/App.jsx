@@ -379,9 +379,9 @@ export default function App() {
   // --------------------------------------------------------------------------
   // MULTI-USER ISOLATION & PIN LOCK SYSTEM
   // --------------------------------------------------------------------------
-  const [activeUserId, setActiveUserId] = useState('user1'); // 'user1' | 'user2'
+  const [activeUserId, setActiveUserId] = useState('user1'); // 'user1' (Master Admin) | 'user2' | 'user3'...
   const [userProfiles, setUserProfiles] = useState({
-    user1: { name: 'Guitarist 1', pin: '7779', syncKey: 'g1-sync-' + Math.random().toString(36).substring(2, 7) },
+    user1: { name: 'Guitarist 1 (Admin)', pin: '7779', syncKey: 'g1-sync-' + Math.random().toString(36).substring(2, 7), isAdmin: true },
     user2: { name: 'Guitarist 2', pin: '1111', syncKey: 'g2-sync-' + Math.random().toString(36).substring(2, 7) }
   });
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
@@ -393,6 +393,12 @@ export default function App() {
   const [currentPinVerify, setCurrentPinVerify] = useState('');
   const [newPinInput, setNewPinInput] = useState('');
   const [pinChangeError, setPinChangeError] = useState('');
+
+  // Admin Profile Creation State (Exclusive to Guitarist 1)
+  const [isAddingProfile, setIsAddingProfile] = useState(false);
+  const [newProfileName, setNewProfileName] = useState('');
+  const [newProfilePin, setNewProfilePin] = useState('');
+  const [adminActionError, setAdminActionError] = useState('');
 
   // Cloud Sync State (Connects PC & Phone seamlessly per user)
   const [syncKey, setSyncKey] = useState('');
@@ -664,23 +670,32 @@ export default function App() {
       const savedProfiles = localStorage.getItem('gps_user_profiles');
       if (savedProfiles) {
         const parsedProfiles = JSON.parse(savedProfiles);
-        // Ensure default PINs are preserved if not set
+        // Ensure Guitarist 1 retains admin privileges and default PIN fallback
         const merged = {
+          ...parsedProfiles,
           user1: {
             ...parsedProfiles.user1,
             pin: parsedProfiles.user1?.pin || '7779',
-            name: parsedProfiles.user1?.name || 'Guitarist 1'
-          },
-          user2: {
-            ...parsedProfiles.user2,
-            pin: parsedProfiles.user2?.pin || '1111',
-            name: parsedProfiles.user2?.name || 'Guitarist 2'
+            name: parsedProfiles.user1?.name || 'Guitarist 1 (Admin)',
+            isAdmin: true
           }
         };
         setUserProfiles(merged);
         if (merged[uid]?.syncKey) {
           setSyncKey(merged[uid].syncKey);
           fetchCloudData(merged[uid].syncKey);
+        } else {
+          // Guarantee every profile has a generated sync key ready to go
+          const generatedKey = `g_${(merged[uid]?.name || uid).toLowerCase().replace(/[^a-z0-9]/g, '')}_${Math.random().toString(36).substring(2, 6)}`;
+          const updatedWithKey = {
+            ...merged,
+            [uid]: { ...merged[uid], syncKey: generatedKey }
+          };
+          setUserProfiles(updatedWithKey);
+          setSyncKey(generatedKey);
+          try {
+            localStorage.setItem('gps_user_profiles', JSON.stringify(updatedWithKey));
+          } catch {}
         }
       }
 
@@ -812,15 +827,81 @@ export default function App() {
       ...userProfiles,
       [activeUserId]: {
         ...userProfiles[activeUserId],
-        name: newName.trim() || `Guitarist ${activeUserId === 'user1' ? '1' : '2'}`
+        name: newName.trim() || `Guitarist ${activeUserId.replace('user', '')}`
       }
     };
     saveUserProfiles(updated);
   };
 
+  // ADMIN-ONLY HANDLERS (Guitarist 1 / user1 exclusive)
+  const handleAdminCreateProfile = (e) => {
+    e?.preventDefault();
+    if (activeUserId !== 'user1') {
+      setAdminActionError('Only Guitarist 1 (Master Admin) can create new profiles.');
+      return;
+    }
+
+    if (!newProfileName.trim()) {
+      setAdminActionError('Please enter a guitarist name.');
+      return;
+    }
+
+    if (!newProfilePin.trim() || newProfilePin.trim().length < 4) {
+      setAdminActionError('PIN must be at least 4 digits.');
+      return;
+    }
+
+    const newId = `user_${Date.now()}`;
+    const cleanSyncKey = `g_${newProfileName.trim().toLowerCase().replace(/[^a-z0-9]/g, '')}_${Math.random().toString(36).substring(2, 6)}`;
+
+    const updated = {
+      ...userProfiles,
+      [newId]: {
+        name: newProfileName.trim(),
+        pin: newProfilePin.trim(),
+        syncKey: cleanSyncKey
+      }
+    };
+
+    saveUserProfiles(updated);
+    setIsAddingProfile(false);
+    setNewProfileName('');
+    setNewProfilePin('');
+    setAdminActionError('');
+    audioEngine.playUiSound('step');
+  };
+
+  const handleAdminDeleteProfile = (targetId) => {
+    if (activeUserId !== 'user1') {
+      setAdminActionError('Only Guitarist 1 (Master Admin) can delete profiles.');
+      return;
+    }
+
+    if (targetId === 'user1') {
+      setAdminActionError('Cannot delete Master Admin profile.');
+      return;
+    }
+
+    const updated = { ...userProfiles };
+    delete updated[targetId];
+
+    // Clean up associated local storage
+    try {
+      localStorage.removeItem(`gps_history_${targetId}`);
+      localStorage.removeItem(`gps_exercises_${targetId}`);
+      localStorage.removeItem(`gps_practiced_dates_${targetId}`);
+      localStorage.removeItem(`gps_gx_theme_${targetId}`);
+      localStorage.removeItem(`gps_practice_session_${targetId}`);
+    } catch {}
+
+    saveUserProfiles(updated);
+    audioEngine.playUiSound('step');
+  };
+
   // CLOUD SYNC ENGINE (Synchronizes PC & Phone per isolated user)
   const syncToCloud = async (overrideData = null) => {
-    const activeSyncKey = userProfiles[activeUserId]?.syncKey || syncKey;
+    // Universal sync resolution: works dynamically for active user regardless of role
+    const activeSyncKey = userProfiles[activeUserId]?.syncKey || syncKey || `g_${activeUserId}`;
     if (!activeSyncKey) {
       setSyncStatus('error');
       return;
@@ -867,7 +948,7 @@ export default function App() {
   };
 
   const fetchCloudData = async (keyToFetch = null) => {
-    const rawKey = keyToFetch || userProfiles[activeUserId]?.syncKey || syncKey;
+    const rawKey = keyToFetch || userProfiles[activeUserId]?.syncKey || syncKey || `g_${activeUserId}`;
     if (!rawKey) {
       setSyncStatus('error');
       return;
@@ -4687,36 +4768,52 @@ export default function App() {
             </p>
 
             {/* Profile Cards */}
-            <div className="grid grid-cols-2 gap-2.5">
-              {['user1', 'user2'].map(uid => {
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 max-h-56 overflow-y-auto pr-1">
+              {Object.keys(userProfiles).map(uid => {
                 const isSelected = activeUserId === uid;
                 const prof = userProfiles[uid];
+                const isUserAdmin = uid === 'user1';
+
                 return (
                   <div
                     key={uid}
-                    className={`p-3.5 rounded-xl border transition-all text-left flex flex-col justify-between ${
+                    className={`p-3 rounded-xl border transition-all text-left flex flex-col justify-between ${
                       isSelected
                         ? 'bg-[#1B1B25] border-white/20 shadow-lg'
                         : 'bg-[#101016] border-white/5 opacity-80 hover:opacity-100'
                     }`}
                   >
                     <div>
-                      <div className="flex items-center justify-between mb-1.5">
-                        <span className="text-[10px] font-mono font-bold text-[#92929F] uppercase">
-                          {uid === 'user1' ? 'Slot 1' : 'Slot 2'}
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-[9px] font-mono font-bold uppercase" style={{ color: isUserAdmin ? currentTheme.primary : '#92929F' }}>
+                          {isUserAdmin ? '★ ADMIN' : 'USER'}
                         </span>
-                        {prof.pin ? (
-                          <Lock className="w-3 h-3 text-[#10B981]" title="PIN Protected" />
-                        ) : (
-                          <Unlock className="w-3 h-3 text-[#92929F]" title="No PIN Set" />
-                        )}
+                        <div className="flex items-center gap-1">
+                          {prof.pin ? (
+                            <Lock className="w-3 h-3 text-[#10B981]" title="PIN Protected" />
+                          ) : (
+                            <Unlock className="w-3 h-3 text-[#92929F]" title="No PIN Set" />
+                          )}
+                          {activeUserId === 'user1' && !isUserAdmin && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleAdminDeleteProfile(uid);
+                              }}
+                              className="text-[#92929F] hover:text-[#EF4444] transition-colors p-0.5"
+                              title="Delete Profile (Admin Only)"
+                            >
+                              <Trash2 className="w-3 h-3" />
+                            </button>
+                          )}
+                        </div>
                       </div>
-                      <h4 className="text-sm font-bold text-white font-mono truncate">{prof.name}</h4>
+                      <h4 className="text-xs sm:text-sm font-bold text-white font-mono truncate">{prof.name}</h4>
                     </div>
 
                     <button
                       onClick={() => requestSwitchUser(uid)}
-                      className="mt-3 w-full py-1.5 rounded-lg text-xs font-bold font-mono transition-all"
+                      className="mt-2.5 w-full py-1 rounded-lg text-[11px] font-bold font-mono transition-all"
                       style={{
                         backgroundColor: isSelected ? currentTheme.primary : '#1B1B25',
                         color: '#FFFFFF'
@@ -4728,6 +4825,74 @@ export default function App() {
                 );
               })}
             </div>
+
+            {/* Admin Profile Creator Bar (Exclusive to Guitarist 1) */}
+            {activeUserId === 'user1' && (
+              <div className="bg-[#101016] p-3 rounded-xl border border-white/10 space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5 text-xs font-bold text-white font-mono">
+                    <ShieldCheck className="w-4 h-4 text-[#10B981]" />
+                    Master Admin Controls
+                  </div>
+                  <button
+                    onClick={() => {
+                      setIsAddingProfile(!isAddingProfile);
+                      setAdminActionError('');
+                    }}
+                    className="px-2.5 py-1 rounded-lg text-xs font-bold font-mono transition-all flex items-center gap-1"
+                    style={{
+                      backgroundColor: isAddingProfile ? '#1B1B25' : currentTheme.primary,
+                      color: '#FFFFFF'
+                    }}
+                  >
+                    <Plus className="w-3 h-3 stroke-[3]" />
+                    {isAddingProfile ? 'Cancel' : 'Add Profile'}
+                  </button>
+                </div>
+
+                {isAddingProfile && (
+                  <form onSubmit={handleAdminCreateProfile} className="space-y-2 pt-2 border-t border-white/5 animate-in fade-in duration-150">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      <div>
+                        <label className="text-[10px] uppercase font-bold text-[#92929F] block mb-1">New Member Name</label>
+                        <input
+                          type="text"
+                          required
+                          placeholder="e.g. Guitarist 3 / Dave"
+                          value={newProfileName}
+                          onChange={(e) => setNewProfileName(e.target.value)}
+                          className="w-full bg-[#1B1B25] border border-white/10 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none font-mono"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[10px] uppercase font-bold text-[#92929F] block mb-1">Initial 4-Digit PIN</label>
+                        <input
+                          type="password"
+                          required
+                          maxLength={6}
+                          placeholder="••••"
+                          value={newProfilePin}
+                          onChange={(e) => setNewProfilePin(e.target.value)}
+                          className="w-full bg-[#1B1B25] border border-white/10 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none font-mono tracking-widest text-center"
+                        />
+                      </div>
+                    </div>
+
+                    {adminActionError && (
+                      <div className="text-[11px] text-[#EF4444] font-bold text-center">{adminActionError}</div>
+                    )}
+
+                    <button
+                      type="submit"
+                      className="w-full py-1.5 rounded-lg text-white text-xs font-bold font-mono transition-all active:scale-95 shadow-md"
+                      style={{ backgroundColor: currentTheme.primary }}
+                    >
+                      Authorize & Create Profile
+                    </button>
+                  </form>
+                )}
+              </div>
+            )}
 
             {/* Manage Active Profile Settings */}
             <div className="bg-[#101016] p-3 rounded-xl border border-white/5 space-y-3">
