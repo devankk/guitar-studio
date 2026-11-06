@@ -7,7 +7,7 @@ import {
   Square, Download, Upload, Trash2, Award, Flame, Target, Compass,
   Menu, X, Film, CheckCircle2, TrendingUp, Palette, ShieldCheck, Keyboard,
   Cloud, CloudCheck, RefreshCcw, User, Users, Lock, Unlock, KeyRound,
-  LogOut, ShieldAlert
+  LogOut, ShieldAlert, Timer
 } from 'lucide-react';
 
 // ============================================================================
@@ -405,6 +405,13 @@ export default function App() {
   const [volume, setVolume] = useState(0.85);
   const [activeMetronomeMode, setActiveMetronomeMode] = useState('standard');
   const [isHotkeysModalOpen, setIsHotkeysModalOpen] = useState(false);
+
+  // --------------------------------------------------------------------------
+  // MANUAL SESSION PRACTICE STOPWATCH / TIMER STATE
+  // --------------------------------------------------------------------------
+  const [isManualTimerRunning, setIsManualTimerRunning] = useState(false);
+  const [manualPracticeSeconds, setManualPracticeSeconds] = useState(0);
+  const [manualTimerStartTime, setManualTimerStartTime] = useState(null);
 
   // --------------------------------------------------------------------------
   // MANDATORY PROFILE GATEWAY & AUTHENTICATION STATE
@@ -1164,6 +1171,62 @@ export default function App() {
 
     return () => clearInterval(timer);
   }, []);
+
+  // Dedicated manual practice stopwatch interval
+  useEffect(() => {
+    let stopwatchInterval = null;
+    if (isManualTimerRunning) {
+      stopwatchInterval = setInterval(() => {
+        setManualPracticeSeconds(prev => prev + 1);
+      }, 1000);
+    } else {
+      if (stopwatchInterval) clearInterval(stopwatchInterval);
+    }
+    return () => {
+      if (stopwatchInterval) clearInterval(stopwatchInterval);
+    };
+  }, [isManualTimerRunning]);
+
+  // Format seconds to HH:MM:SS or MM:SS helper
+  const formatStopwatchTime = (totalSeconds) => {
+    const hours = Math.floor(totalSeconds / 3600);
+    const mins = Math.floor((totalSeconds % 3600) / 60);
+    const secs = totalSeconds % 60;
+    if (hours > 0) {
+      return `${String(hours).padStart(2, '0')}:${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+    }
+    return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+  };
+
+  const handleToggleManualTimer = () => {
+    if (!isManualTimerRunning && manualPracticeSeconds === 0) {
+      setManualTimerStartTime(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
+    }
+    setIsManualTimerRunning(prev => !prev);
+    audioEngine.playUiSound('step');
+  };
+
+  const handleResetManualTimer = () => {
+    setIsManualTimerRunning(false);
+    setManualPracticeSeconds(0);
+    setManualTimerStartTime(null);
+    audioEngine.playUiSound('step');
+  };
+
+  const handleFinishManualSession = () => {
+    setIsManualTimerRunning(false);
+    // If we have at least 15 seconds, map it to minutes and open the log modal
+    const elapsedMinutes = Math.max(1, Math.round(manualPracticeSeconds / 60));
+    setPracticeSession(prev => ({
+      ...prev,
+      step1: { ...prev.step1, elapsedSeconds: Math.round(manualPracticeSeconds * 0.3) },
+      step2: { ...prev.step2, elapsedSeconds: Math.round(manualPracticeSeconds * 0.4) },
+      step3: { ...prev.step3, elapsedSeconds: Math.round(manualPracticeSeconds * 0.2) },
+      step4: { ...prev.step4, elapsedSeconds: Math.round(manualPracticeSeconds * 0.1) }
+    }));
+    setIsLogModalOpen(true);
+    audioEngine.playUiSound('step');
+  };
 
   // Recording stopwatch
   useEffect(() => {
@@ -2684,6 +2747,33 @@ export default function App() {
 
         {/* Profile Switcher, Sync & GX Themes */}
         <div className="flex items-center gap-1.5 sm:gap-2">
+          {/* Quick Header Practice Stopwatch Widget */}
+          <div className="hidden xl:flex items-center gap-2 bg-[#15151D] border border-white/10 px-2.5 py-1 rounded-xl">
+            <Timer className={`w-3.5 h-3.5 ${isManualTimerRunning ? 'text-[#10B981] animate-pulse' : 'text-[#92929F]'}`} />
+            <span className="font-mono font-bold text-xs text-white tracking-wider">
+              {formatStopwatchTime(manualPracticeSeconds)}
+            </span>
+            <button
+              onClick={handleToggleManualTimer}
+              className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded transition-all"
+              style={{
+                backgroundColor: isManualTimerRunning ? '#EF4444' : '#10B981',
+                color: '#FFFFFF'
+              }}
+            >
+              {isManualTimerRunning ? 'PAUSE' : 'START'}
+            </button>
+            {manualPracticeSeconds > 0 && !isManualTimerRunning && (
+              <button
+                onClick={handleFinishManualSession}
+                className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded text-white"
+                style={{ backgroundColor: currentTheme.primary }}
+              >
+                LOG
+              </button>
+            )}
+          </div>
+
           {/* User Profile Switcher Button */}
           <button
             onClick={() => setIsProfileModalOpen(true)}
@@ -2804,6 +2894,92 @@ export default function App() {
         {/* MODULE 1: DAILY PRACTICE DASHBOARD */}
         {activeTab === 'daily' && (
           <div className="space-y-3 sm:space-y-5 w-full flex-1">
+            {/* MANUAL PRACTICE SESSION STOPWATCH BANNER */}
+            <div className="bg-[#15151D] border border-white/5 rounded-2xl p-3.5 sm:p-4 shadow-xl flex flex-col md:flex-row items-center justify-between gap-3 relative overflow-hidden">
+              <div
+                className="absolute -top-12 -left-12 w-36 h-36 rounded-full pointer-events-none blur-2xl opacity-15"
+                style={{ backgroundColor: currentTheme.primary }}
+              />
+
+              <div className="flex items-center gap-3 w-full md:w-auto relative z-10">
+                <div
+                  className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
+                  style={{
+                    backgroundColor: isManualTimerRunning ? '#10B98125' : currentTheme.accentBg,
+                    color: isManualTimerRunning ? '#10B981' : currentTheme.primary
+                  }}
+                >
+                  <Timer className={`w-5 h-5 ${isManualTimerRunning ? 'animate-pulse' : ''}`} />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] uppercase font-bold text-[#92929F] tracking-widest font-mono">
+                      Manual Practice Session Tracker
+                    </span>
+                    {isManualTimerRunning && (
+                      <span className="text-[9px] font-mono font-bold px-1.5 py-0.2 rounded-full bg-[#10B981]/20 text-[#10B981] animate-pulse">
+                        LIVE RECORDING
+                      </span>
+                    )}
+                  </div>
+                  <div className="text-xl sm:text-2xl font-black font-mono text-white tracking-wider">
+                    {formatStopwatchTime(manualPracticeSeconds)}
+                    <span className="text-xs font-normal text-[#92929F] ml-2">
+                      ({Math.floor(manualPracticeSeconds / 3600)}h {Math.floor((manualPracticeSeconds % 3600) / 60)}m elapsed)
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 w-full md:w-auto justify-end relative z-10">
+                <button
+                  onClick={handleToggleManualTimer}
+                  className="flex-1 md:flex-none px-4 py-2 sm:py-2.5 rounded-xl font-bold font-mono text-xs sm:text-sm text-white flex items-center justify-center gap-1.5 transition-all active:scale-95 shadow-lg"
+                  style={{
+                    backgroundColor: isManualTimerRunning ? '#EF4444' : '#10B981',
+                    boxShadow: isManualTimerRunning ? '0 0 15px rgba(239,68,68,0.4)' : '0 0 15px rgba(16,185,129,0.4)'
+                  }}
+                >
+                  {isManualTimerRunning ? (
+                    <>
+                      <Pause className="w-4 h-4 fill-current" />
+                      PAUSE SESSION
+                    </>
+                  ) : (
+                    <>
+                      <Play className="w-4 h-4 fill-current" />
+                      {manualPracticeSeconds > 0 ? 'RESUME SESSION' : 'START SESSION'}
+                    </>
+                  )}
+                </button>
+
+                {manualPracticeSeconds > 0 && (
+                  <>
+                    <button
+                      onClick={handleFinishManualSession}
+                      className="flex-1 md:flex-none px-4 py-2 sm:py-2.5 rounded-xl text-white font-bold font-mono text-xs sm:text-sm flex items-center justify-center gap-1.5 transition-all active:scale-95"
+                      style={{
+                        backgroundColor: currentTheme.primary,
+                        boxShadow: `0 0 15px ${currentTheme.glow}`
+                      }}
+                      title="Log this session duration to your history"
+                    >
+                      <CheckCircle2 className="w-4 h-4" />
+                      END & LOG
+                    </button>
+
+                    <button
+                      onClick={handleResetManualTimer}
+                      className="p-2 sm:p-2.5 rounded-xl bg-[#1B1B25] text-[#92929F] hover:text-white border border-white/5 transition-all"
+                      title="Reset stopwatch to zero"
+                    >
+                      <RotateCcw className="w-4 h-4" />
+                    </button>
+                  </>
+                )}
+              </div>
+            </div>
+
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 pb-1">
               <div>
                 <h2 className="text-xl sm:text-2xl lg:text-3xl font-bold tracking-tight text-white font-mono flex items-center gap-2">
@@ -3925,7 +4101,7 @@ export default function App() {
                   <Calendar className="w-5 h-5 lg:w-6 lg:h-6" style={{ color: currentTheme.primary }} />
                   Practice History & Logs
                 </h2>
-                <p className="text-xs sm:text-sm text-[#92929F]">Step-by-step logs, verified tempo gains & technique notes.</p>
+                <p className="text-xs sm:text-sm text-[#92929F]">Daily summed practice hours, session details & tempo gains.</p>
               </div>
 
               <button
@@ -3937,64 +4113,7 @@ export default function App() {
               </button>
             </div>
 
-            {/* Comparison with Previous Session */}
-            {(() => {
-              const chronologicalSessions = [...historySessions].sort(
-                (a, b) => (b.date || '').localeCompare(a.date || '') || (b.id || '').localeCompare(a.id || '')
-              );
-
-              if (chronologicalSessions.length < 2) return null;
-
-              const latest = chronologicalSessions[0];
-              const prev = chronologicalSessions[1];
-              const edgeDelta = (latest.edgeBpm || 0) - (prev.edgeBpm || 0);
-              const burstDelta = (latest.burstBpm || 0) - (prev.burstBpm || 0);
-              const durationDelta = (latest.totalDurationMinutes || 0) - (prev.totalDurationMinutes || 0);
-
-              return (
-                <div className="bg-[#15151D] border border-white/5 rounded-2xl p-4 sm:p-5 shadow-lg flex items-center justify-between flex-wrap gap-3 w-full">
-                  <div className="flex items-center gap-3">
-                    <div
-                      className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center"
-                      style={{
-                        backgroundColor: currentTheme.accentBg,
-                        color: currentTheme.primary
-                      }}
-                    >
-                      <Zap className="w-4 h-4 sm:w-5 sm:h-5" />
-                    </div>
-                    <div>
-                      <h4 className="text-xs sm:text-sm lg:text-base font-bold text-white font-mono">Latest vs Previous Session Delta</h4>
-                      <p className="text-[11px] sm:text-xs text-[#92929F] font-mono">
-                        {latest.date} vs {prev.date}
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-3 sm:gap-6 lg:gap-8 text-xs sm:text-sm font-mono">
-                    <div>
-                      <span className="text-[10px] text-[#92929F] uppercase block">Edge Delta</span>
-                      <span className={`font-bold ${edgeDelta >= 0 ? 'text-[#10B981]' : 'text-[#EF4444]'}`}>
-                        {edgeDelta >= 0 ? '+' : ''}{edgeDelta} BPM
-                      </span>
-                    </div>
-                    <div>
-                      <span className="text-[10px] text-[#92929F] uppercase block">Burst Delta</span>
-                      <span className={`font-bold ${burstDelta >= 0 ? 'text-[#10B981]' : 'text-[#EF4444]'}`}>
-                        {burstDelta >= 0 ? '+' : ''}{burstDelta} BPM
-                      </span>
-                    </div>
-                    <div>
-                      <span className="text-[10px] text-[#92929F] uppercase block">Duration Delta</span>
-                      <span className="font-bold" style={{ color: currentTheme.primary }}>
-                        {durationDelta >= 0 ? '+' : ''}{durationDelta} mins
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              );
-            })()}
-
+            {/* Filter and Search Bar */}
             <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 bg-[#15151D] p-2.5 sm:p-3 rounded-2xl border border-white/5 w-full">
               <div className="flex-1 relative">
                 <input
@@ -4022,7 +4141,7 @@ export default function App() {
               </div>
             </div>
 
-            {/* Filtered List */}
+            {/* Filtered & Grouped by Date Sessions List with Daily Sum Totals */}
             {(() => {
               const filtered = historySessions.filter(s => {
                 if (!historySearchTerm.trim()) return true;
@@ -4030,18 +4149,11 @@ export default function App() {
                 const allFocus = [...(s.step1Focus || []), ...(s.step2Focus || []), ...(s.step3Focus || []), ...(s.step4Focus || [])].join(' ').toLowerCase();
                 const notes = (s.notes || '').toLowerCase();
                 const date = (s.date || '').toLowerCase();
-                return allFocus.includes(term) || notes.includes(term) || date.includes(term);
+                const exName = (s.exerciseName || '').toLowerCase();
+                return allFocus.includes(term) || notes.includes(term) || date.includes(term) || exName.includes(term);
               });
 
-              const sorted = [...filtered].sort((a, b) => {
-                if (historySortOrder === 'newest') return (b.date || '').localeCompare(a.date || '');
-                if (historySortOrder === 'oldest') return (a.date || '').localeCompare(b.date || '');
-                if (historySortOrder === 'fastest') return (b.edgeBpm || 0) - (a.edgeBpm || 0);
-                if (historySortOrder === 'longest') return (b.totalDurationMinutes || 0) - (a.totalDurationMinutes || 0);
-                return 0;
-              });
-
-              if (sorted.length === 0) {
+              if (filtered.length === 0) {
                 return (
                   <div className="bg-[#15151D] border border-white/5 rounded-2xl p-8 text-center w-full">
                     <BookOpen className="w-8 h-8 text-[#92929F] mx-auto mb-2 opacity-50" />
@@ -4051,70 +4163,159 @@ export default function App() {
                 );
               }
 
+              // Group sessions strictly by date
+              const groupedByDate = filtered.reduce((acc, session) => {
+                const dateKey = session.date || 'Unspecified Date';
+                if (!acc[dateKey]) {
+                  acc[dateKey] = [];
+                }
+                acc[dateKey].push(session);
+                return acc;
+              }, {});
+
+              // Sort the date groups according to selected sort order
+              const sortedDates = Object.keys(groupedByDate).sort((a, b) => {
+                if (historySortOrder === 'oldest') return a.localeCompare(b);
+                if (historySortOrder === 'fastest') {
+                  const maxA = Math.max(...groupedByDate[a].map(s => s.edgeBpm || 0));
+                  const maxB = Math.max(...groupedByDate[b].map(s => s.edgeBpm || 0));
+                  return maxB - maxA;
+                }
+                if (historySortOrder === 'longest') {
+                  const totalA = groupedByDate[a].reduce((sum, s) => sum + (s.totalDurationMinutes || 0), 0);
+                  const totalB = groupedByDate[b].reduce((sum, s) => sum + (s.totalDurationMinutes || 0), 0);
+                  return totalB - totalA;
+                }
+                // default 'newest'
+                return b.localeCompare(a);
+              });
+
+              const formatTotalTime = (totalMins) => {
+                const hours = Math.floor(totalMins / 60);
+                const mins = totalMins % 60;
+                if (hours > 0) {
+                  return `${hours}h ${mins}m`;
+                }
+                return `${mins}m`;
+              };
+
               return (
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 sm:gap-4 w-full">
-                  {sorted.map(session => (
-                    <div
-                      key={session.id}
-                      onClick={() => setInspectedSession(session)}
-                      className="bg-[#15151D] border border-white/5 hover:border-white/20 rounded-2xl p-4 sm:p-5 shadow-lg transition-all cursor-pointer group flex flex-col justify-between"
-                    >
-                      <div>
-                        <div className="flex items-center justify-between border-b border-white/5 pb-2.5 sm:pb-3 mb-2.5 sm:mb-3">
-                          <div className="flex items-center gap-2">
-                            <Calendar className="w-4 h-4" style={{ color: currentTheme.primary }} />
+                <div className="space-y-6 w-full">
+                  {sortedDates.map(dateKey => {
+                    const daySessions = groupedByDate[dateKey];
+                    const totalDayMinutes = daySessions.reduce((sum, s) => sum + (Number(s.totalDurationMinutes) || 0), 0);
+                    const formattedDayTime = formatTotalTime(totalDayMinutes);
+
+                    return (
+                      <div key={dateKey} className="space-y-3 bg-[#101016]/80 p-3 sm:p-5 rounded-3xl border border-white/5">
+                        {/* Daily Aggregated Header */}
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2.5 border-b border-white/5">
+                          <div className="flex items-center gap-2.5">
+                            <div
+                              className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0"
+                              style={{ backgroundColor: currentTheme.accentBg, color: currentTheme.primary }}
+                            >
+                              <Calendar className="w-4 h-4" />
+                            </div>
                             <div>
-                              <span className="text-xs sm:text-sm font-bold text-white group-hover:text-white transition-colors font-mono">
-                                {session.date}
-                              </span>
-                              {session.exerciseName && (
-                                <span className="text-[10px] sm:text-xs text-[#92929F] block truncate max-w-[200px] sm:max-w-xs font-normal">
-                                  {session.exerciseName}
+                              <div className="flex items-center gap-2">
+                                <h3 className="text-sm sm:text-base font-bold text-white font-mono tracking-tight">
+                                  {dateKey}
+                                </h3>
+                                <span className="text-[10px] font-mono text-[#92929F] px-2 py-0.5 rounded-full bg-[#15151D] border border-white/5">
+                                  {daySessions.length} {daySessions.length === 1 ? 'session' : 'sessions'}
                                 </span>
-                              )}
+                              </div>
+                              <span className="text-[11px] text-[#92929F] font-mono">Daily cumulative practice summary</span>
                             </div>
                           </div>
-                          <div className="flex items-center gap-2">
-                            <span className="text-[11px] sm:text-xs font-mono font-bold text-[#10B981] bg-[#10B981]/10 px-2 sm:px-2.5 py-0.5 rounded-full border border-[#10B981]/20">
-                              {session.totalDurationMinutes} Mins Total
-                            </span>
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleDeleteSession(session.id);
+
+                          {/* Summed Total Time Badge prominently placed next to the date */}
+                          <div className="flex items-center gap-2 self-start sm:self-auto">
+                            <span className="text-xs uppercase font-mono font-bold text-[#92929F]">Total Day Time:</span>
+                            <div
+                              className="px-3 py-1 rounded-xl text-xs sm:text-sm font-mono font-black border flex items-center gap-1.5 shadow-lg"
+                              style={{
+                                backgroundColor: currentTheme.accentBg,
+                                borderColor: currentTheme.borderActive,
+                                color: currentTheme.primary,
+                                boxShadow: `0 0 12px ${currentTheme.glowSubtle}`
                               }}
-                              title="Delete this practice session"
-                              className="p-1.5 rounded-lg bg-[#1B1B25] text-[#92929F] hover:text-[#EF4444] hover:bg-[#EF4444]/10 border border-white/5 transition-colors flex-shrink-0"
                             >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
-                            <ChevronRight className="w-4 h-4 text-[#92929F] group-hover:translate-x-1 transition-transform" />
+                              <Clock className="w-3.5 h-3.5 stroke-[2.5]" />
+                              <span>{formattedDayTime}</span>
+                              <span className="text-[10px] font-normal opacity-80">({totalDayMinutes} mins total)</span>
+                            </div>
                           </div>
                         </div>
 
-                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3 bg-[#101016] p-2.5 sm:p-3 rounded-xl border border-white/5 mb-2.5 sm:mb-3">
-                          <div>
-                            <span className="text-[9px] sm:text-[10px] text-[#92929F] uppercase font-semibold">Comfort</span>
-                            <div className="text-xs sm:text-sm font-bold font-mono text-[#10B981]">{session.comfortBpm} BPM</div>
-                          </div>
-                          <div>
-                            <span className="text-[9px] sm:text-[10px] text-[#92929F] uppercase font-semibold">Clean Edge</span>
-                            <div className="text-xs sm:text-sm font-bold font-mono text-[#3B82F6]">{session.edgeBpm} BPM</div>
-                          </div>
-                          <div>
-                            <span className="text-[9px] sm:text-[10px] text-[#92929F] uppercase font-semibold">Speed Bursts</span>
-                            <div className="text-xs sm:text-sm font-bold font-mono text-[#EF4444]">{session.burstBpm} BPM</div>
-                          </div>
-                          <div>
-                            <span className="text-[9px] sm:text-[10px] text-[#92929F] uppercase font-semibold">Next Target</span>
-                            <div className="text-xs sm:text-sm font-bold font-mono" style={{ color: currentTheme.primary }}>{session.targetBpm} BPM</div>
-                          </div>
+                        {/* Individual Sessions on that Date */}
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+                          {daySessions.map(session => (
+                            <div
+                              key={session.id}
+                              onClick={() => setInspectedSession(session)}
+                              className="bg-[#15151D] border border-white/5 hover:border-white/20 rounded-2xl p-4 shadow-lg transition-all cursor-pointer group flex flex-col justify-between"
+                            >
+                              <div>
+                                <div className="flex items-center justify-between border-b border-white/5 pb-2.5 mb-2.5">
+                                  <div className="truncate max-w-[200px] sm:max-w-xs">
+                                    <span className="text-xs sm:text-sm font-bold text-white group-hover:text-white transition-colors font-mono truncate block">
+                                      {session.exerciseName || 'Custom / Free Routine'}
+                                    </span>
+                                    {session.category && (
+                                      <span className="text-[9px] font-mono font-bold text-[#92929F] uppercase tracking-wider block">
+                                        {session.category}
+                                      </span>
+                                    )}
+                                  </div>
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-[11px] font-mono font-bold text-[#10B981] bg-[#10B981]/10 px-2 py-0.5 rounded-full border border-[#10B981]/20 whitespace-nowrap">
+                                      {session.totalDurationMinutes} mins
+                                    </span>
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleDeleteSession(session.id);
+                                      }}
+                                      title="Delete this practice session"
+                                      className="p-1.5 rounded-lg bg-[#1B1B25] text-[#92929F] hover:text-[#EF4444] hover:bg-[#EF4444]/10 border border-white/5 transition-colors flex-shrink-0"
+                                    >
+                                      <Trash2 className="w-3.5 h-3.5" />
+                                    </button>
+                                    <ChevronRight className="w-4 h-4 text-[#92929F] group-hover:translate-x-1 transition-transform" />
+                                  </div>
+                                </div>
+
+                                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 bg-[#101016] p-2.5 rounded-xl border border-white/5 mb-2.5 text-center">
+                                  <div>
+                                    <span className="text-[9px] text-[#92929F] uppercase font-semibold">Comfort</span>
+                                    <div className="text-xs font-bold font-mono text-[#10B981]">{session.comfortBpm} BPM</div>
+                                  </div>
+                                  <div>
+                                    <span className="text-[9px] text-[#92929F] uppercase font-semibold">Clean Edge</span>
+                                    <div className="text-xs font-bold font-mono text-[#3B82F6]">{session.edgeBpm} BPM</div>
+                                  </div>
+                                  <div>
+                                    <span className="text-[9px] text-[#92929F] uppercase font-semibold">Speed Bursts</span>
+                                    <div className="text-xs font-bold font-mono text-[#EF4444]">{session.burstBpm} BPM</div>
+                                  </div>
+                                  <div>
+                                    <span className="text-[9px] text-[#92929F] uppercase font-semibold">Next Target</span>
+                                    <div className="text-xs font-bold font-mono" style={{ color: currentTheme.primary }}>{session.targetBpm} BPM</div>
+                                  </div>
+                                </div>
+                              </div>
+
+                              {session.notes && (
+                                <p className="text-[11px] text-[#92929F] italic line-clamp-1">&ldquo;{session.notes}&rdquo;</p>
+                              )}
+                            </div>
+                          ))}
                         </div>
                       </div>
-
-                      <p className="text-[11px] sm:text-xs text-[#92929F] italic line-clamp-1">&ldquo;{session.notes}&rdquo;</p>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               );
             })()}
@@ -4353,38 +4554,190 @@ export default function App() {
 
       {/* EXERCISE DRILL-DOWN MODAL */}
       {inspectedExerciseProgress && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-[#15151D] border border-white/10 rounded-2xl p-5 max-w-lg w-full shadow-2xl space-y-4 max-h-[85vh] overflow-y-auto pb-28 md:pb-6">
-            <div className="flex items-center justify-between pb-2 border-b border-white/5">
-              <h3 className="text-base font-bold text-white font-mono">{inspectedExerciseProgress.name}</h3>
-              <button onClick={() => setInspectedExerciseProgress(null)} className="text-[#92929F] hover:text-white">
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4">
+          <div className="bg-[#15151D] border border-white/10 rounded-2xl p-4 sm:p-6 max-w-2xl w-full shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto pb-20 md:pb-6 animate-in fade-in zoom-in-95">
+            <div className="flex items-center justify-between pb-3 border-b border-white/5">
+              <div>
+                <span className="text-[10px] uppercase font-bold text-[#92929F] tracking-widest font-mono block">
+                  Exercise Progression History
+                </span>
+                <h3 className="text-base sm:text-lg font-bold text-white font-mono flex items-center gap-2">
+                  {inspectedExerciseProgress.name}
+                  <span
+                    className="text-[9px] px-2 py-0.5 rounded-full border font-mono font-bold"
+                    style={{
+                      backgroundColor: currentTheme.accentBg,
+                      borderColor: currentTheme.borderActive,
+                      color: currentTheme.primary
+                    }}
+                  >
+                    {inspectedExerciseProgress.category}
+                  </span>
+                </h3>
+              </div>
+              <button
+                onClick={() => setInspectedExerciseProgress(null)}
+                className="text-[#92929F] hover:text-white text-lg p-1"
+              >
                 &times;
               </button>
             </div>
-            <div className="grid grid-cols-3 gap-2 bg-[#101016] p-3 rounded-xl font-mono text-center text-xs">
+
+            {/* KPI Benchmarks */}
+            <div className="grid grid-cols-4 gap-2 bg-[#101016] p-3 rounded-xl font-mono text-center text-xs border border-white/5">
               <div>
-                <span className="text-[#92929F]">Start</span>
-                <div className="font-bold text-white">{inspectedExerciseProgress.startBpm} BPM</div>
+                <span className="text-[10px] text-[#92929F] uppercase block">Start</span>
+                <div className="font-bold text-white sm:text-sm">{inspectedExerciseProgress.startBpm} BPM</div>
               </div>
               <div>
-                <span className="text-[#92929F]">Current</span>
-                <div className="font-bold" style={{ color: currentTheme.primary }}>{inspectedExerciseProgress.currentBpm} BPM</div>
+                <span className="text-[10px] text-[#92929F] uppercase block">Current Edge</span>
+                <div className="font-bold sm:text-sm" style={{ color: currentTheme.primary }}>
+                  {inspectedExerciseProgress.currentBpm} BPM
+                </div>
               </div>
               <div>
-                <span className="text-[#92929F]">Goal</span>
-                <div className="font-bold text-[#3B82F6]">{inspectedExerciseProgress.targetBpm} BPM</div>
+                <span className="text-[10px] text-[#92929F] uppercase block">Goal</span>
+                <div className="font-bold sm:text-sm text-[#3B82F6]">{inspectedExerciseProgress.targetBpm} BPM</div>
+              </div>
+              <div>
+                <span className="text-[10px] text-[#92929F] uppercase block">Burst Record</span>
+                <div className="font-bold sm:text-sm text-[#EF4444]">
+                  {inspectedExerciseProgress.bestBurstBpm || inspectedExerciseProgress.currentBpm + 15} BPM
+                </div>
               </div>
             </div>
-            <button
-              onClick={() => {
-                loadExerciseIntoRoutine(inspectedExerciseProgress);
-                setInspectedExerciseProgress(null);
-              }}
-              className="w-full py-2 rounded-xl text-white font-bold text-xs font-mono"
-              style={{ backgroundColor: currentTheme.primary }}
-            >
-              PRACTICE THIS EXERCISE NOW
-            </button>
+
+            {/* Progress Bar Towards Goal */}
+            {(() => {
+              const range = (inspectedExerciseProgress.targetBpm - inspectedExerciseProgress.startBpm) || 1;
+              const current = (inspectedExerciseProgress.currentBpm - inspectedExerciseProgress.startBpm);
+              const pct = Math.min(100, Math.max(0, Math.round((current / range) * 100)));
+              return (
+                <div className="space-y-1">
+                  <div className="flex items-center justify-between text-xs font-mono">
+                    <span className="text-[#92929F]">Overall Goal Completion</span>
+                    <span className="font-bold text-white">{pct}%</span>
+                  </div>
+                  <div className="w-full bg-[#101016] h-2.5 rounded-full overflow-hidden border border-white/5">
+                    <div
+                      className="h-full rounded-full transition-all duration-300"
+                      style={{ width: `${pct}%`, backgroundColor: currentTheme.primary }}
+                    />
+                  </div>
+                </div>
+              );
+            })()}
+
+            {/* Exercise-Specific Practice History Logs */}
+            <div className="space-y-2 pt-2">
+              <div className="flex items-center justify-between">
+                <span className="text-xs uppercase font-bold text-white font-mono flex items-center gap-1.5">
+                  <Calendar className="w-3.5 h-3.5" style={{ color: currentTheme.primary }} />
+                  Logged Sessions for this Exercise
+                </span>
+                <span className="text-[11px] font-mono text-[#92929F]">
+                  {historySessions.filter(s =>
+                    s.exerciseId === inspectedExerciseProgress.id ||
+                    (s.exerciseName && s.exerciseName.toLowerCase() === inspectedExerciseProgress.name.toLowerCase())
+                  ).length} Total Sessions
+                </span>
+              </div>
+
+              {(() => {
+                const exerciseLogs = historySessions.filter(s =>
+                  s.exerciseId === inspectedExerciseProgress.id ||
+                  (s.exerciseName && s.exerciseName.toLowerCase() === inspectedExerciseProgress.name.toLowerCase())
+                ).sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+
+                if (exerciseLogs.length === 0) {
+                  return (
+                    <div className="bg-[#101016] border border-white/5 rounded-xl p-5 text-center font-mono">
+                      <p className="text-xs text-[#92929F] mb-1">No practice sessions logged specifically for this exercise yet.</p>
+                      <p className="text-[11px] text-[#92929F]">Click below to load it into your daily routine and log your first milestone!</p>
+                    </div>
+                  );
+                }
+
+                return (
+                  <div className="space-y-2.5 max-h-60 overflow-y-auto pr-1">
+                    {exerciseLogs.map(log => (
+                      <div
+                        key={log.id}
+                        className="bg-[#101016] border border-white/5 hover:border-white/15 rounded-xl p-3 transition-all font-mono text-xs space-y-2"
+                      >
+                        <div className="flex items-center justify-between border-b border-white/5 pb-1.5">
+                          <span className="font-bold text-white">{log.date}</span>
+                          <span className="text-[#10B981] bg-[#10B981]/10 px-2 py-0.5 rounded-full text-[10px] border border-[#10B981]/20">
+                            {log.totalDurationMinutes} mins duration
+                          </span>
+                        </div>
+
+                        {/* Tempo milestones for this session */}
+                        <div className="grid grid-cols-4 gap-1.5 text-center text-[10px] bg-[#15151D] p-2 rounded-lg">
+                          <div>
+                            <span className="text-[#92929F] block">Comfort</span>
+                            <span className="font-bold text-[#10B981]">{log.comfortBpm} BPM</span>
+                          </div>
+                          <div>
+                            <span className="text-[#92929F] block">Edge</span>
+                            <span className="font-bold text-[#3B82F6]">{log.edgeBpm} BPM</span>
+                          </div>
+                          <div>
+                            <span className="text-[#92929F] block">Burst</span>
+                            <span className="font-bold text-[#EF4444]">{log.burstBpm} BPM</span>
+                          </div>
+                          <div>
+                            <span className="text-[#92929F] block">Next Goal</span>
+                            <span className="font-bold" style={{ color: currentTheme.primary }}>{log.targetBpm} BPM</span>
+                          </div>
+                        </div>
+
+                        {/* Focus tags if available */}
+                        {((log.step1Focus?.length || 0) + (log.step2Focus?.length || 0) + (log.step3Focus?.length || 0)) > 0 && (
+                          <div className="flex items-center gap-1 flex-wrap">
+                            <span className="text-[9px] text-[#92929F] uppercase">Focus:</span>
+                            {[...(log.step1Focus || []), ...(log.step2Focus || []), ...(log.step3Focus || [])].slice(0, 4).map((f, i) => (
+                              <span key={i} className="text-[9px] px-1.5 py-0.5 rounded bg-[#1B1B25] text-[#92929F] border border-white/5">
+                                {f}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+
+                        {log.notes && (
+                          <p className="text-[11px] text-[#92929F] italic line-clamp-2">
+                            &ldquo;{log.notes}&rdquo;
+                          </p>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                );
+              })()}
+            </div>
+
+            <div className="flex gap-2 pt-2 border-t border-white/5">
+              <button
+                onClick={() => setInspectedExerciseProgress(null)}
+                className="flex-1 py-2.5 rounded-xl bg-[#1B1B25] text-xs font-bold text-[#92929F] hover:text-white"
+              >
+                Close
+              </button>
+              <button
+                onClick={() => {
+                  loadExerciseIntoRoutine(inspectedExerciseProgress);
+                  setInspectedExerciseProgress(null);
+                }}
+                className="flex-[2] py-2.5 rounded-xl text-white font-bold text-xs font-mono flex items-center justify-center gap-2 active:scale-95 transition-all shadow-lg"
+                style={{
+                  backgroundColor: currentTheme.primary,
+                  boxShadow: `0 0 15px ${currentTheme.glow}`
+                }}
+              >
+                <Play className="w-3.5 h-3.5 fill-current" />
+                PRACTICE THIS EXERCISE NOW
+              </button>
+            </div>
           </div>
         </div>
       )}
