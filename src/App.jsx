@@ -739,6 +739,7 @@ export default function App() {
           try {
             localStorage.setItem('gps_user_profiles', JSON.stringify(updatedWithKey));
           } catch {}
+          fetchCloudData(generatedKey);
         }
       }
 
@@ -769,7 +770,7 @@ export default function App() {
     }
   };
 
-  // Local storage initialization & Profile Profiles Pre-loader
+  // Local storage initialization & Session Persistence (Login Only Once)
   useEffect(() => {
     try {
       const savedProfiles = localStorage.getItem('gps_user_profiles');
@@ -786,9 +787,21 @@ export default function App() {
         };
         setUserProfiles(merged);
       }
-    } catch {}
-    // Intentionally keep isAuthenticated as false upon first load/share
-    setIsAuthenticated(false);
+
+      // Check if user has already authenticated previously
+      const savedAuthUser = localStorage.getItem('gps_auth_user');
+      const isAuthFlag = localStorage.getItem('gps_is_authenticated');
+
+      if (isAuthFlag === 'true' && savedAuthUser) {
+        setActiveUserId(savedAuthUser);
+        setIsAuthenticated(true);
+        loadUserData(savedAuthUser);
+      } else {
+        setIsAuthenticated(false);
+      }
+    } catch {
+      setIsAuthenticated(false);
+    }
   }, []);
 
   // Login authentication handler for the initial lock gateway
@@ -811,18 +824,27 @@ export default function App() {
       return;
     }
 
-    // Successfully verified!
+    // Successfully verified! Save persistent session so refresh skips login
     performUserSwitch(selectedLoginUser);
     setIsAuthenticated(true);
+    try {
+      localStorage.setItem('gps_is_authenticated', 'true');
+      localStorage.setItem('gps_auth_user', selectedLoginUser);
+    } catch {}
+
     setLoginErrorMessage('');
     setLoginPinInput('');
     audioEngine.playUiSound('step');
   };
 
-  // Sign out / Lock studio back to gateway
+  // Sign out / Lock studio back to gateway (Only time login shows again)
   const handleLockStudio = () => {
     stopAllMetronomes();
     setIsAuthenticated(false);
+    try {
+      localStorage.removeItem('gps_is_authenticated');
+      localStorage.removeItem('gps_auth_user');
+    } catch {}
     setSelectedLoginUser(null);
     setLoginPinInput('');
     setLoginErrorMessage('');
@@ -1738,6 +1760,20 @@ export default function App() {
       currentBpm: 90,
       targetBpm: 140
     });
+
+    // Auto-save & Auto-sync to Cloud
+    const updatedExList = [created, ...exercises];
+    try {
+      localStorage.setItem(`gps_exercises_${activeUserId}`, JSON.stringify(updatedExList));
+    } catch {}
+    syncToCloud({
+      userId: activeUserId,
+      profileName: userProfiles[activeUserId]?.name,
+      historySessions,
+      exercises: updatedExList,
+      practicedCalendarDays,
+      updatedAt: new Date().toISOString()
+    });
   };
 
   const handleDeleteExercise = (id) => {
@@ -1746,6 +1782,15 @@ export default function App() {
       try {
         localStorage.setItem(`gps_exercises_${activeUserId}`, JSON.stringify(updated));
       } catch {}
+      // Auto-sync deletion to Cloud
+      syncToCloud({
+        userId: activeUserId,
+        profileName: userProfiles[activeUserId]?.name,
+        historySessions,
+        exercises: updated,
+        practicedCalendarDays,
+        updatedAt: new Date().toISOString()
+      });
       return updated;
     });
   };
@@ -1756,6 +1801,15 @@ export default function App() {
       try {
         localStorage.setItem(`gps_history_${activeUserId}`, JSON.stringify(updated));
       } catch {}
+      // Auto-sync session deletion to Cloud
+      syncToCloud({
+        userId: activeUserId,
+        profileName: userProfiles[activeUserId]?.name,
+        historySessions: updated,
+        exercises,
+        practicedCalendarDays,
+        updatedAt: new Date().toISOString()
+      });
       return updated;
     });
   };
@@ -1885,6 +1939,7 @@ export default function App() {
       } catch {}
     }
 
+    // 4. Mark all steps as complete in active session state
     setPracticeSession(prev => ({
       ...prev,
       step1: { ...prev.step1, isCompleted: true, elapsedSeconds: 0 },
@@ -1893,11 +1948,13 @@ export default function App() {
       step4: { ...prev.step4, isCompleted: true, elapsedSeconds: 0 }
     }));
 
+    // 5. Save History to user-specific localStorage permanently
     const updatedHistory = [newSession, ...historySessions];
     try {
       localStorage.setItem(`gps_history_${activeUserId}`, JSON.stringify(updatedHistory));
     } catch {}
 
+    // 6. Automatically Broadcast to Cloud for this specific user's sync key
     syncToCloud({
       userId: activeUserId,
       profileName: userProfiles[activeUserId]?.name,
@@ -1912,9 +1969,22 @@ export default function App() {
   };
 
   const toggleCalendarDate = (dateStr) => {
-    setPracticedCalendarDays(prev =>
-      prev.includes(dateStr) ? prev.filter(d => d !== dateStr) : [...prev, dateStr]
-    );
+    setPracticedCalendarDays(prev => {
+      const updated = prev.includes(dateStr) ? prev.filter(d => d !== dateStr) : [...prev, dateStr];
+      try {
+        localStorage.setItem(`gps_practiced_dates_${activeUserId}`, JSON.stringify(updated));
+      } catch {}
+      // Auto-sync calendar update to cloud
+      syncToCloud({
+        userId: activeUserId,
+        profileName: userProfiles[activeUserId]?.name,
+        historySessions,
+        exercises,
+        practicedCalendarDays: updated,
+        updatedAt: new Date().toISOString()
+      });
+      return updated;
+    });
   };
 
   const startCamera = async () => {
