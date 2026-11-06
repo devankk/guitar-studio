@@ -5,7 +5,8 @@ import {
   BookOpen, Clock, Activity, Zap, RefreshCw, Layers, Sliders,
   HelpCircle, ChevronDown, ChevronUp, Music, ArrowUp, ArrowDown,
   Square, Download, Upload, Trash2, Award, Flame, Target, Compass,
-  Menu, X, Film, CheckCircle2, TrendingUp, Palette, ShieldCheck, Keyboard
+  Menu, X, Film, CheckCircle2, TrendingUp, Palette, ShieldCheck, Keyboard,
+  Cloud, CloudCheck, RefreshCcw, User, Users, Lock, Unlock, KeyRound
 } from 'lucide-react';
 
 // ============================================================================
@@ -375,6 +376,30 @@ export default function App() {
   const [activeMetronomeMode, setActiveMetronomeMode] = useState('standard');
   const [isHotkeysModalOpen, setIsHotkeysModalOpen] = useState(false);
 
+  // --------------------------------------------------------------------------
+  // MULTI-USER ISOLATION & PIN LOCK SYSTEM
+  // --------------------------------------------------------------------------
+  const [activeUserId, setActiveUserId] = useState('user1'); // 'user1' | 'user2'
+  const [userProfiles, setUserProfiles] = useState({
+    user1: { name: 'Guitarist 1', pin: '7779', syncKey: 'g1-sync-' + Math.random().toString(36).substring(2, 7) },
+    user2: { name: 'Guitarist 2', pin: '1111', syncKey: 'g2-sync-' + Math.random().toString(36).substring(2, 7) }
+  });
+  const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
+  const [isPinModalOpen, setIsPinModalOpen] = useState(false);
+  const [targetSwitchUser, setTargetSwitchUser] = useState(null);
+  const [enteredPin, setEnteredPin] = useState('');
+  const [pinError, setPinError] = useState('');
+  const [isSettingPin, setIsSettingPin] = useState(false);
+  const [currentPinVerify, setCurrentPinVerify] = useState('');
+  const [newPinInput, setNewPinInput] = useState('');
+  const [pinChangeError, setPinChangeError] = useState('');
+
+  // Cloud Sync State (Connects PC & Phone seamlessly per user)
+  const [syncKey, setSyncKey] = useState('');
+  const [isSyncModalOpen, setIsSyncModalOpen] = useState(false);
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [syncStatus, setSyncStatus] = useState(null); // 'synced' | 'error' | null
+
   // GX Cyber Theme State
   const [currentThemeKey, setCurrentThemeKey] = useState('crimson');
   const [isThemePickerOpen, setIsThemePickerOpen] = useState(false);
@@ -633,33 +658,249 @@ export default function App() {
   const recordedChunksRef = useRef([]);
   const recordingTimerRef = useRef(null);
 
-  // Local storage initialization
-  useEffect(() => {
+  // Load User Data based on Active User ID (Absolute Data Isolation)
+  const loadUserData = (uid) => {
     try {
-      const savedTheme = localStorage.getItem('gps_gx_theme');
+      const savedProfiles = localStorage.getItem('gps_user_profiles');
+      if (savedProfiles) {
+        const parsedProfiles = JSON.parse(savedProfiles);
+        // Ensure default PINs are preserved if not set
+        const merged = {
+          user1: {
+            ...parsedProfiles.user1,
+            pin: parsedProfiles.user1?.pin || '7779',
+            name: parsedProfiles.user1?.name || 'Guitarist 1'
+          },
+          user2: {
+            ...parsedProfiles.user2,
+            pin: parsedProfiles.user2?.pin || '1111',
+            name: parsedProfiles.user2?.name || 'Guitarist 2'
+          }
+        };
+        setUserProfiles(merged);
+        if (merged[uid]?.syncKey) {
+          setSyncKey(merged[uid].syncKey);
+          fetchCloudData(merged[uid].syncKey);
+        }
+      }
+
+      const savedTheme = localStorage.getItem(`gps_gx_theme_${uid}`);
       if (savedTheme && GX_THEMES[savedTheme]) setCurrentThemeKey(savedTheme);
 
-      const savedSession = localStorage.getItem('gps_practice_session');
+      const savedSession = localStorage.getItem(`gps_practice_session_${uid}`);
       if (savedSession) setPracticeSession(JSON.parse(savedSession));
 
-      const savedHistory = localStorage.getItem('gps_history');
+      const savedHistory = localStorage.getItem(`gps_history_${uid}`);
       if (savedHistory) setHistorySessions(JSON.parse(savedHistory));
+      else setHistorySessions([]);
 
-      const savedExercises = localStorage.getItem('gps_exercises');
+      const savedExercises = localStorage.getItem(`gps_exercises_${uid}`);
       if (savedExercises) setExercises(JSON.parse(savedExercises));
+      else {
+        // Default starting exercises for a fresh profile
+        setExercises([
+          { id: 'ex-1', name: 'Chromatic Warmup (1-2-3-4)', category: 'Chromatic', startBpm: 70, currentBpm: 100, targetBpm: 140, lastPracticed: '2026-11-04', sessionsCount: 1, bestBurstBpm: 115 },
+          { id: 'ex-2', name: 'Paul Gilbert 6-Note Picking', category: 'Alternate Picking', startBpm: 80, currentBpm: 110, targetBpm: 160, lastPracticed: '2026-11-04', sessionsCount: 1, bestBurstBpm: 125 }
+        ]);
+      }
 
-      const savedCal = localStorage.getItem('gps_practiced_dates');
+      const savedCal = localStorage.getItem(`gps_practiced_dates_${uid}`);
       if (savedCal) setPracticedCalendarDays(JSON.parse(savedCal));
+      else setPracticedCalendarDays([]);
     } catch {
       // LocalStorage access fallback
     }
+  };
+
+  // Local storage initialization
+  useEffect(() => {
+    try {
+      const savedLastUser = localStorage.getItem('gps_active_user') || 'user1';
+      setActiveUserId(savedLastUser);
+      loadUserData(savedLastUser);
+    } catch {}
   }, []);
+
+  // Save current profile metadata whenever changed
+  const saveUserProfiles = (updated) => {
+    setUserProfiles(updated);
+    try {
+      localStorage.setItem('gps_user_profiles', JSON.stringify(updated));
+    } catch {}
+  };
+
+  // Profile Switching with PIN Verification
+  const requestSwitchUser = (targetId) => {
+    if (targetId === activeUserId) {
+      setIsProfileModalOpen(false);
+      return;
+    }
+
+    const targetProfile = userProfiles[targetId];
+    if (targetProfile.pin) {
+      // Target profile is protected by a PIN!
+      setTargetSwitchUser(targetId);
+      setEnteredPin('');
+      setPinError('');
+      setIsPinModalOpen(true);
+      setIsProfileModalOpen(false);
+    } else {
+      // No PIN set, switch directly
+      performUserSwitch(targetId);
+      setIsProfileModalOpen(false);
+    }
+  };
+
+  const performUserSwitch = (targetId) => {
+    stopAllMetronomes();
+    setActiveUserId(targetId);
+    try {
+      localStorage.setItem('gps_active_user', targetId);
+    } catch {}
+    loadUserData(targetId);
+    audioEngine.playUiSound('step');
+  };
+
+  const handleVerifyPin = (e) => {
+    e?.preventDefault();
+    if (userProfiles[targetSwitchUser]?.pin === enteredPin) {
+      performUserSwitch(targetSwitchUser);
+      setIsPinModalOpen(false);
+      setEnteredPin('');
+      setPinError('');
+    } else {
+      setPinError('Incorrect PIN code. Access denied.');
+      audioEngine.playUiSound('step');
+    }
+  };
+
+  const handleSetProfilePin = (e) => {
+    e?.preventDefault();
+    setPinChangeError('');
+    const activeProf = userProfiles[activeUserId];
+
+    // Require current PIN verification before allowing change
+    if (activeProf.pin && currentPinVerify !== activeProf.pin) {
+      setPinChangeError('Current PIN is incorrect. Verification failed.');
+      audioEngine.playUiSound('step');
+      return;
+    }
+
+    if (!newPinInput.trim() || newPinInput.trim().length < 4) {
+      setPinChangeError('New PIN must be at least 4 digits.');
+      audioEngine.playUiSound('step');
+      return;
+    }
+
+    const updated = {
+      ...userProfiles,
+      [activeUserId]: {
+        ...userProfiles[activeUserId],
+        pin: newPinInput.trim()
+      }
+    };
+    saveUserProfiles(updated);
+    setIsSettingPin(false);
+    setCurrentPinVerify('');
+    setNewPinInput('');
+    setPinChangeError('');
+    audioEngine.playUiSound('step');
+  };
+
+  const handleUpdateProfileName = (newName) => {
+    const updated = {
+      ...userProfiles,
+      [activeUserId]: {
+        ...userProfiles[activeUserId],
+        name: newName.trim() || `Guitarist ${activeUserId === 'user1' ? '1' : '2'}`
+      }
+    };
+    saveUserProfiles(updated);
+  };
+
+  // CLOUD SYNC ENGINE (Synchronizes PC & Phone per isolated user)
+  const syncToCloud = async (overrideData = null) => {
+    const activeSyncKey = userProfiles[activeUserId]?.syncKey || syncKey;
+    if (!activeSyncKey) return;
+    setIsSyncing(true);
+    const payload = overrideData || {
+      userId: activeUserId,
+      profileName: userProfiles[activeUserId]?.name,
+      historySessions,
+      exercises,
+      practicedCalendarDays,
+      updatedAt: new Date().toISOString()
+    };
+
+    try {
+      // Unique isolated key per user
+      const res = await fetch(`https://kvdb.io/AnCkW8L3xWbS2F45xeqYw5/${activeSyncKey}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      if (res.ok) {
+        setSyncStatus('synced');
+        setTimeout(() => setSyncStatus(null), 3000);
+      }
+    } catch {
+      setSyncStatus('error');
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
+  const fetchCloudData = async (keyToFetch = syncKey) => {
+    const activeSyncKey = keyToFetch || userProfiles[activeUserId]?.syncKey;
+    if (!activeSyncKey) return;
+    setIsSyncing(true);
+    try {
+      const res = await fetch(`https://kvdb.io/AnCkW8L3xWbS2F45xeqYw5/${activeSyncKey}`);
+      if (res.ok) {
+        const data = await res.json();
+        if (data.historySessions) {
+          setHistorySessions(data.historySessions);
+          localStorage.setItem(`gps_history_${activeUserId}`, JSON.stringify(data.historySessions));
+        }
+        if (data.exercises) {
+          setExercises(data.exercises);
+          localStorage.setItem(`gps_exercises_${activeUserId}`, JSON.stringify(data.exercises));
+        }
+        if (data.practicedCalendarDays) {
+          setPracticedCalendarDays(data.practicedCalendarDays);
+          localStorage.setItem(`gps_practiced_dates_${activeUserId}`, JSON.stringify(data.practicedCalendarDays));
+        }
+        setSyncStatus('synced');
+        setTimeout(() => setSyncStatus(null), 3000);
+      }
+    } catch {
+      setSyncStatus('error');
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
+  const handleConnectSyncKey = (newKey) => {
+    const clean = newKey.trim().toLowerCase();
+    if (!clean) return;
+    setSyncKey(clean);
+    const updated = {
+      ...userProfiles,
+      [activeUserId]: {
+        ...userProfiles[activeUserId],
+        syncKey: clean
+      }
+    };
+    saveUserProfiles(updated);
+    fetchCloudData(clean);
+    setIsSyncModalOpen(false);
+  };
 
   const changeTheme = (key) => {
     if (GX_THEMES[key]) {
       setCurrentThemeKey(key);
       try {
-        localStorage.setItem('gps_gx_theme', key);
+        localStorage.setItem(`gps_gx_theme_${activeUserId}`, key);
       } catch {}
     }
   };
@@ -1266,18 +1507,18 @@ export default function App() {
     setExercises(prev => {
       const updated = prev.filter(ex => ex.id !== id);
       try {
-        localStorage.setItem('gps_exercises', JSON.stringify(updated));
+        localStorage.setItem(`gps_exercises_${activeUserId}`, JSON.stringify(updated));
       } catch {}
       return updated;
     });
   };
 
-  // Delete a specific session (useful for pruning duplicates from exercise breakdown or history)
+  // Delete a specific session
   const handleDeleteSession = (sessionId) => {
     setHistorySessions(prev => {
       const updated = prev.filter(s => s.id !== sessionId);
       try {
-        localStorage.setItem('gps_history', JSON.stringify(updated));
+        localStorage.setItem(`gps_history_${activeUserId}`, JSON.stringify(updated));
       } catch {}
       return updated;
     });
@@ -1359,6 +1600,7 @@ export default function App() {
     // 1. Build Comprehensive History Session
     const newSession = {
       id: `session-${Date.now()}`,
+      userId: activeUserId,
       date: todayStr,
       exerciseId: practiceSession.selectedExerciseId,
       exerciseName,
@@ -1383,9 +1625,10 @@ export default function App() {
 
     setHistorySessions(prev => [newSession, ...prev]);
 
-    // 2. Automatically Update Exercise in Library
+    // 2. Automatically Update Exercise in Library for this user
+    let updatedExercises = exercises;
     if (practiceSession.selectedExerciseId && practiceSession.selectedExerciseId !== 'custom') {
-      setExercises(prev => prev.map(ex => {
+      updatedExercises = exercises.map(ex => {
         if (ex.id === practiceSession.selectedExerciseId) {
           return {
             ...ex,
@@ -1396,12 +1639,21 @@ export default function App() {
           };
         }
         return ex;
-      }));
+      });
+      setExercises(updatedExercises);
+      try {
+        localStorage.setItem(`gps_exercises_${activeUserId}`, JSON.stringify(updatedExercises));
+      } catch {}
     }
 
-    // 3. Automatically Update Consistency Calendar
+    // 3. Automatically Update Consistency Calendar for this user
+    let updatedCalendar = practicedCalendarDays;
     if (!practicedCalendarDays.includes(todayStr)) {
-      setPracticedCalendarDays(prev => [...prev, todayStr]);
+      updatedCalendar = [...practicedCalendarDays, todayStr];
+      setPracticedCalendarDays(updatedCalendar);
+      try {
+        localStorage.setItem(`gps_practiced_dates_${activeUserId}`, JSON.stringify(updatedCalendar));
+      } catch {}
     }
 
     // 4. Mark all steps as complete in active session state
@@ -1413,8 +1665,24 @@ export default function App() {
       step4: { ...prev.step4, isCompleted: true, elapsedSeconds: 0 }
     }));
 
+    // 5. Save History to user-specific localStorage permanently
+    const updatedHistory = [newSession, ...historySessions];
+    try {
+      localStorage.setItem(`gps_history_${activeUserId}`, JSON.stringify(updatedHistory));
+    } catch {}
+
+    // 6. Broadcast to Cloud for this specific user's sync key
+    syncToCloud({
+      userId: activeUserId,
+      profileName: userProfiles[activeUserId]?.name,
+      historySessions: updatedHistory,
+      exercises: updatedExercises,
+      practicedCalendarDays: updatedCalendar,
+      updatedAt: new Date().toISOString()
+    });
+
     setIsLogModalOpen(false);
-    setActiveTab('progress'); // Instantly view newly generated insights
+    setActiveTab('progress');
   };
 
   // Calendar toggle for retroactive logging
@@ -2156,7 +2424,7 @@ export default function App() {
                   backgroundColor: currentTheme.accentBg
                 }}
               >
-                GX V2.4
+                GX V2.5
               </span>
             </div>
             <p className="text-[9px] sm:text-[10px] uppercase tracking-wider text-[#92929F] font-semibold hidden xs:block font-gx-display">
@@ -2204,8 +2472,45 @@ export default function App() {
           })}
         </nav>
 
-        {/* Theme Picker & Global Fast Metronome Pill */}
+        {/* Theme Picker, Profile Switcher & Global Fast Metronome Pill */}
         <div className="flex items-center gap-2">
+          {/* User Profile Switcher Button with Lock Status */}
+          <button
+            onClick={() => setIsProfileModalOpen(true)}
+            className="p-1.5 sm:px-2.5 sm:py-1.5 rounded-xl bg-[#15151D] border border-white/10 hover:border-white/20 text-white flex items-center gap-1.5 transition-all text-xs"
+            title="Switch User Profile / Lock Studio"
+          >
+            <div
+              className="w-5 h-5 rounded-lg flex items-center justify-center font-bold text-[10px]"
+              style={{
+                backgroundColor: activeUserId === 'user1' ? currentTheme.accentBg : '#3B82F625',
+                color: activeUserId === 'user1' ? currentTheme.primary : '#3B82F6'
+              }}
+            >
+              {activeUserId === 'user1' ? 'P1' : 'P2'}
+            </div>
+            <span className="hidden sm:inline font-mono font-bold text-xs truncate max-w-[90px]">
+              {userProfiles[activeUserId]?.name}
+            </span>
+            {userProfiles[activeUserId]?.pin ? (
+              <Lock className="w-3 h-3 text-[#10B981]" />
+            ) : (
+              <Unlock className="w-3 h-3 text-[#92929F]" />
+            )}
+          </button>
+
+          {/* Cloud Sync Button */}
+          <button
+            onClick={() => setIsSyncModalOpen(true)}
+            className="p-1.5 sm:px-2.5 sm:py-1.5 rounded-xl bg-[#15151D] border border-white/10 hover:border-white/20 text-[#92929F] hover:text-white flex items-center gap-1.5 transition-all text-xs"
+            title="Cloud Sync (Connect Phone & PC)"
+          >
+            <Cloud className={`w-3.5 h-3.5 ${isSyncing ? 'animate-bounce text-[#3B82F6]' : syncStatus === 'synced' ? 'text-[#10B981]' : ''}`} />
+            <span className="hidden sm:inline text-[11px] font-gx-display font-bold">
+              {isSyncing ? 'Syncing...' : syncStatus === 'synced' ? 'Synced' : 'Sync'}
+            </span>
+          </button>
+
           {/* GX Theme Selector Popover Button */}
           <div className="relative">
             <button
@@ -2590,6 +2895,49 @@ export default function App() {
 
               {currentStepOpen === 3 && (
                 <div className="mt-4 pt-4 border-t border-white/5 space-y-4">
+                  {/* Timer Controls */}
+                  <div className="flex items-center justify-between flex-wrap gap-2 bg-[#101016] p-3 rounded-xl border border-white/5">
+                    <div className="flex items-center gap-2">
+                      <Clock className="w-4 h-4 text-[#EF4444]" />
+                      <span className="text-xs text-[#92929F]">Timer:</span>
+                      <span className="font-mono font-bold text-sm text-white">
+                        {Math.floor(practiceSession.step3.remainingSeconds / 60)}:
+                        {String(practiceSession.step3.remainingSeconds % 60).padStart(2, '0')}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      {[1, 2, 3, 5, 7, 10, 15].map(mins => (
+                        <button
+                          key={mins}
+                          onClick={() => handleTimerDurationChange('step3', mins)}
+                          className={`px-2 py-1 rounded-lg text-[10px] font-mono font-bold border ${
+                            practiceSession.step3.durationMinutes === mins
+                              ? 'bg-[#EF4444]/20 border-[#EF4444] text-[#EF4444]'
+                              : 'bg-[#1B1B25] border-white/5 text-[#92929F] hover:text-white'
+                          }`}
+                        >
+                          {mins}m
+                        </button>
+                      ))}
+
+                      <button
+                        onClick={() => toggleTimer('step3')}
+                        className="px-3 py-1 rounded-lg text-xs font-bold font-mono text-white ml-1"
+                        style={{ backgroundColor: practiceSession.step3.isTimerRunning ? '#F59E0B' : '#EF4444' }}
+                      >
+                        {practiceSession.step3.isTimerRunning ? 'Pause' : 'Start Timer'}
+                      </button>
+                      <button
+                        onClick={() => resetTimer('step3')}
+                        className="p-1 rounded-lg bg-[#1B1B25] text-[#92929F] hover:text-white"
+                        title="Reset Timer"
+                      >
+                        <RotateCcw className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </div>
+
                   {/* Quick Burst Trigger Bar */}
                   <div className="bg-[#101016] p-3 rounded-xl border border-white/5 flex items-center justify-between flex-wrap gap-2">
                     <div className="flex items-center gap-2">
@@ -4252,8 +4600,307 @@ export default function App() {
 
       {/* Footer */}
       <footer className="hidden md:block border-t border-white/5 py-4 px-6 text-center text-[11px] text-[#92929F] font-gx-display">
-        Wannabe Guitarist's Studio &bull; Opera GX Gaming Metronome HUD &bull; Space: Play/Pause &bull; &uarr;/&darr;: Tempo
+        Wannabe Guitarist's Studio &bull; Isolated Multi-User &bull; Space: Play/Pause &bull; &uarr;/&darr;: Tempo
       </footer>
+
+      {/* MULTI-USER PROFILES & PIN SECURITY MODAL */}
+      {isProfileModalOpen && (
+        <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-3 sm:p-4">
+          <div className="bg-[#15151D] border border-white/10 rounded-2xl p-5 sm:p-6 max-w-md w-full shadow-2xl space-y-4 animate-in fade-in zoom-in-95">
+            <div className="flex items-center justify-between pb-3 border-b border-white/5">
+              <div className="flex items-center gap-2">
+                <Users className="w-5 h-5 text-white" />
+                <h3 className="text-base sm:text-lg font-bold text-white font-gx-display">Guitarist Profile Studio</h3>
+              </div>
+              <button onClick={() => setIsProfileModalOpen(false)} className="text-[#92929F] hover:text-white text-lg p-1">
+                &times;
+              </button>
+            </div>
+
+            <p className="text-xs text-[#92929F] leading-relaxed">
+              Two separate guitarists can use this app with 100% isolated history, library, and cloud sync. Lock your profile with a PIN so nobody else can mess up your progress!
+            </p>
+
+            {/* Profile Cards */}
+            <div className="grid grid-cols-2 gap-2.5">
+              {['user1', 'user2'].map(uid => {
+                const isSelected = activeUserId === uid;
+                const prof = userProfiles[uid];
+                return (
+                  <div
+                    key={uid}
+                    className={`p-3.5 rounded-xl border transition-all text-left flex flex-col justify-between ${
+                      isSelected
+                        ? 'bg-[#1B1B25] border-white/20 shadow-lg'
+                        : 'bg-[#101016] border-white/5 opacity-80 hover:opacity-100'
+                    }`}
+                  >
+                    <div>
+                      <div className="flex items-center justify-between mb-1.5">
+                        <span className="text-[10px] font-mono font-bold text-[#92929F] uppercase">
+                          {uid === 'user1' ? 'Slot 1' : 'Slot 2'}
+                        </span>
+                        {prof.pin ? (
+                          <Lock className="w-3 h-3 text-[#10B981]" title="PIN Protected" />
+                        ) : (
+                          <Unlock className="w-3 h-3 text-[#92929F]" title="No PIN Set" />
+                        )}
+                      </div>
+                      <h4 className="text-sm font-bold text-white font-mono truncate">{prof.name}</h4>
+                    </div>
+
+                    <button
+                      onClick={() => requestSwitchUser(uid)}
+                      className="mt-3 w-full py-1.5 rounded-lg text-xs font-bold font-mono transition-all"
+                      style={{
+                        backgroundColor: isSelected ? currentTheme.primary : '#1B1B25',
+                        color: '#FFFFFF'
+                      }}
+                    >
+                      {isSelected ? 'ACTIVE' : 'SWITCH'}
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Manage Active Profile Settings */}
+            <div className="bg-[#101016] p-3 rounded-xl border border-white/5 space-y-3">
+              <span className="text-[10px] uppercase font-bold text-[#92929F] block">
+                Manage {userProfiles[activeUserId]?.name}
+              </span>
+
+              <div>
+                <label className="text-[11px] text-[#92929F] block mb-1">Guitarist Display Name</label>
+                <input
+                  type="text"
+                  value={userProfiles[activeUserId]?.name || ''}
+                  onChange={(e) => handleUpdateProfileName(e.target.value)}
+                  className="w-full bg-[#1B1B25] border border-white/10 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none font-mono"
+                />
+              </div>
+
+              {/* PIN Code Setup */}
+              <div className="pt-2 border-t border-white/5 flex items-center justify-between">
+                <div>
+                  <span className="text-xs font-bold text-white block">PIN Protection</span>
+                  <span className="text-[10px] text-[#92929F]">
+                    {userProfiles[activeUserId]?.pin ? 'Protected by personal PIN' : 'Unprotected'}
+                  </span>
+                </div>
+
+                <button
+                  onClick={() => {
+                    setIsSettingPin(!isSettingPin);
+                    setCurrentPinVerify('');
+                    setNewPinInput('');
+                    setPinChangeError('');
+                  }}
+                  className="px-2.5 py-1 rounded-lg bg-[#1B1B25] border border-white/10 text-xs font-bold text-white hover:border-white/20"
+                >
+                  {isSettingPin ? 'Cancel' : 'Change My PIN'}
+                </button>
+              </div>
+
+              {isSettingPin && (
+                <form onSubmit={handleSetProfilePin} className="pt-2 space-y-2.5 border-t border-white/5 animate-in fade-in duration-150">
+                  <div className="text-[11px] text-[#92929F]">
+                    Enter your current PIN to authenticate changes for <strong>{userProfiles[activeUserId]?.name}</strong>:
+                  </div>
+
+                  <div>
+                    <label className="text-[10px] uppercase font-bold text-[#92929F] block mb-1">Current PIN</label>
+                    <input
+                      type="password"
+                      maxLength={6}
+                      placeholder="••••"
+                      value={currentPinVerify}
+                      onChange={(e) => setCurrentPinVerify(e.target.value)}
+                      className="w-full bg-[#1B1B25] border border-white/10 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none font-mono text-center tracking-widest"
+                      required
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-[10px] uppercase font-bold text-[#92929F] block mb-1">New 4–6 Digit PIN</label>
+                    <input
+                      type="password"
+                      maxLength={6}
+                      placeholder="••••"
+                      value={newPinInput}
+                      onChange={(e) => setNewPinInput(e.target.value)}
+                      className="w-full bg-[#1B1B25] border border-white/10 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none font-mono text-center tracking-widest"
+                      required
+                    />
+                  </div>
+
+                  {pinChangeError && (
+                    <div className="text-[11px] text-[#EF4444] font-bold text-center">{pinChangeError}</div>
+                  )}
+
+                  <div className="flex gap-2 pt-1">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsSettingPin(false);
+                        setCurrentPinVerify('');
+                        setNewPinInput('');
+                        setPinChangeError('');
+                      }}
+                      className="flex-1 py-1.5 rounded-lg bg-[#1B1B25] text-xs font-semibold text-[#92929F] hover:text-white"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      className="flex-1 py-1.5 rounded-lg text-white text-xs font-bold font-mono transition-all active:scale-95"
+                      style={{ backgroundColor: currentTheme.primary }}
+                    >
+                      Update My PIN
+                    </button>
+                  </div>
+                </form>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* PIN ENTRY MODAL (Prevents unauthorized profile switching) */}
+      {isPinModalOpen && (
+        <div className="fixed inset-0 z-50 bg-black/90 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="bg-[#15151D] border-2 border-white/20 rounded-2xl p-6 max-w-xs w-full shadow-2xl text-center space-y-4 animate-in zoom-in-95">
+            <div
+              className="w-12 h-12 rounded-xl flex items-center justify-center mx-auto"
+              style={{ backgroundColor: currentTheme.accentBg, color: currentTheme.primary }}
+            >
+              <KeyRound className="w-6 h-6" />
+            </div>
+
+            <div>
+              <h3 className="text-base font-bold text-white font-gx-display">Profile Locked</h3>
+              <p className="text-xs text-[#92929F] mt-1">
+                Enter PIN for <strong>{userProfiles[targetSwitchUser]?.name}</strong>
+              </p>
+            </div>
+
+            <form onSubmit={handleVerifyPin} className="space-y-3">
+              <input
+                type="password"
+                maxLength={6}
+                autoFocus
+                placeholder="••••"
+                value={enteredPin}
+                onChange={(e) => setEnteredPin(e.target.value)}
+                className="w-full bg-[#101016] border border-white/10 rounded-xl py-2 text-center text-lg tracking-widest text-white focus:outline-none font-mono"
+              />
+
+              {pinError && (
+                <div className="text-[11px] text-[#EF4444] font-bold">{pinError}</div>
+              )}
+
+              <div className="flex gap-2 pt-1">
+                <button
+                  type="button"
+                  onClick={() => setIsPinModalOpen(false)}
+                  className="flex-1 py-2 rounded-xl bg-[#1B1B25] text-xs font-bold text-[#92929F]"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 py-2 rounded-xl text-white text-xs font-bold font-mono"
+                  style={{ backgroundColor: currentTheme.primary }}
+                >
+                  Unlock
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* CLOUD DEVICE SYNC MODAL (Connect Phone & PC per User) */}
+      {isSyncModalOpen && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4">
+          <div className="bg-[#15151D] border border-white/10 rounded-2xl p-5 sm:p-6 max-w-md w-full shadow-2xl space-y-4 animate-in fade-in zoom-in-95">
+            <div className="flex items-center justify-between pb-3 border-b border-white/5">
+              <div className="flex items-center gap-2">
+                <Cloud className="w-5 h-5 text-[#3B82F6]" />
+                <h3 className="text-base sm:text-lg font-bold text-white font-gx-display">
+                  Live Cloud Sync ({userProfiles[activeUserId]?.name})
+                </h3>
+              </div>
+              <button onClick={() => setIsSyncModalOpen(false)} className="text-[#92929F] hover:text-white text-lg p-1">
+                &times;
+              </button>
+            </div>
+
+            <p className="text-xs text-[#92929F] leading-relaxed">
+              This Sync Key connects <strong>{userProfiles[activeUserId]?.name}</strong> between your PC and phone. The second user has their own separate key and won't affect your sessions!
+            </p>
+
+            <div className="bg-[#101016] p-3 rounded-xl border border-white/10">
+              <span className="text-[10px] text-[#92929F] uppercase font-bold block mb-1">
+                {userProfiles[activeUserId]?.name}'s Sync Key
+              </span>
+              <div className="flex items-center justify-between gap-2">
+                <input
+                  type="text"
+                  value={userProfiles[activeUserId]?.syncKey || ''}
+                  onChange={(e) => {
+                    const keyVal = e.target.value.toLowerCase();
+                    const updated = {
+                      ...userProfiles,
+                      [activeUserId]: { ...userProfiles[activeUserId], syncKey: keyVal }
+                    };
+                    saveUserProfiles(updated);
+                  }}
+                  className="bg-transparent font-mono font-bold text-sm text-white focus:outline-none w-full"
+                />
+                <button
+                  onClick={() => {
+                    navigator.clipboard?.writeText(userProfiles[activeUserId]?.syncKey || '');
+                    audioEngine.playUiSound('step');
+                  }}
+                  className="px-2.5 py-1 rounded-lg bg-[#1B1B25] text-[11px] font-bold text-[#92929F] hover:text-white border border-white/5"
+                >
+                  Copy
+                </button>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 pt-1">
+              <button
+                onClick={() => syncToCloud()}
+                disabled={isSyncing}
+                className="flex-1 py-2.5 rounded-xl bg-[#3B82F6] hover:bg-[#2563EB] text-white font-bold text-xs flex items-center justify-center gap-1.5 transition-all active:scale-95"
+              >
+                <Upload className="w-3.5 h-3.5" />
+                Upload PC Data to Cloud
+              </button>
+
+              <button
+                onClick={() => fetchCloudData()}
+                disabled={isSyncing}
+                className="flex-1 py-2.5 rounded-xl bg-[#1B1B25] border border-white/10 hover:border-white/20 text-white font-bold text-xs flex items-center justify-center gap-1.5 transition-all active:scale-95"
+              >
+                <RefreshCcw className={`w-3.5 h-3.5 ${isSyncing ? 'animate-spin' : ''}`} />
+                Fetch on Phone
+              </button>
+            </div>
+
+            <div className="pt-2 border-t border-white/5 text-[11px] text-[#92929F]">
+              <strong className="text-white">To sync this user on your phone:</strong>
+              <ol className="list-decimal list-inside space-y-1 mt-1 text-[10px] sm:text-[11px]">
+                <li>Copy the Sync Key above on your PC.</li>
+                <li>On your phone, switch to this user's profile and tap <strong>Sync</strong>.</li>
+                <li>Paste this exact key and tap <strong>Fetch on Phone</strong>.</li>
+              </ol>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
