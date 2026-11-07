@@ -14,7 +14,7 @@ import {
 // TYPOGRAPHY INJECTION & FONT STYLES (OPERA GX HIGH-TECH GAMING & AUDIO AESTHETIC)
 // ============================================================================
 const FONT_STYLES = `
-  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&display=swap');
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700;800&family=Rajdhani:wght@500;600;700;800&family=Space+Grotesk:wght@500;600;700&display=swap');
 
   :root {
     --app-vh: 100dvh;
@@ -28,10 +28,6 @@ const FONT_STYLES = `
     min-height: 100dvh;
     background-color: #08080C;
     overflow-x: hidden;
-    -webkit-font-smoothing: antialiased;
-    -moz-osx-font-smoothing: grayscale;
-    text-rendering: optimizeLegibility;
-    color: #F8FAFC;
   }
 
   .font-gx-display {
@@ -50,54 +46,9 @@ const FONT_STYLES = `
     font-feature-settings: "tnum" 1;
   }
 
-  .text-white { color: #F8FAFC !important; }
-  .text-\[#92929F\] { color: #94A3B8 !important; }
-
   .font-gx-body {
-    font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
     letter-spacing: -0.01em;
-  }
-
-  /* Clean UI typography: reserve monospace for values, not every label. */
-  .font-mono {
-    font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
-    letter-spacing: -0.012em;
-  }
-
-  .font-gx-num {
-    font-family: 'JetBrains Mono', monospace;
-    font-variant-numeric: tabular-nums lining-nums;
-    font-feature-settings: "tnum" 1, "cv01" 1, "zero" 1;
-    letter-spacing: -0.015em;
-  }
-
-  .font-gx-code {
-    font-family: 'JetBrains Mono', monospace;
-    font-variant-numeric: tabular-nums;
-    font-feature-settings: "tnum" 1, "cv01" 1, "zero" 1;
-    line-height: 1.45;
-  }
-
-  input, textarea, select, button {
-    font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
-  }
-
-  h1, h2, h3, h4 {
-    text-wrap: balance;
-    letter-spacing: -0.025em;
-  }
-
-  button, input, textarea, select {
-    transition: border-color 160ms ease, box-shadow 160ms ease, transform 160ms ease, background-color 160ms ease;
-  }
-
-  input:focus, textarea:focus, select:focus {
-    outline: none;
-    box-shadow: 0 0 0 2px rgba(255,255,255,0.08);
-  }
-
-  ::selection {
-    background: rgba(255,255,255,0.16);
   }
 
   /* Fluid typography scaling for extreme viewports */
@@ -497,9 +448,8 @@ export default function App() {
   // MANUAL SESSION PRACTICE STOPWATCH / TIMER STATE
   // --------------------------------------------------------------------------
   const [isManualTimerRunning, setIsManualTimerRunning] = useState(false);
-  const [manualPracticeSeconds, setManualPracticeSeconds] = useState(() => { try { return Number(localStorage.getItem('gps_manual_practice_seconds') || 0); } catch { return 0; } });
-  const [manualTimerStartTime, setManualTimerStartTime] = useState(() => { try { return localStorage.getItem('gps_manual_practice_start') || null; } catch { return null; } });
-  const [manualPracticeLogs, setManualPracticeLogs] = useState(() => { try { return JSON.parse(localStorage.getItem('gps_manual_practice_logs') || '[]'); } catch { return []; } });
+  const [manualPracticeSeconds, setManualPracticeSeconds] = useState(0);
+  const [manualTimerStartTime, setManualTimerStartTime] = useState(null);
 
   // --------------------------------------------------------------------------
   // MANDATORY PROFILE GATEWAY & AUTHENTICATION STATE
@@ -555,12 +505,6 @@ export default function App() {
 
   // Step Accordion open states
   const [currentStepOpen, setCurrentStepOpen] = useState(1);
-  // Identifies which practice step currently owns the shared audio engine.
-  const [activeTrainingStep, setActiveTrainingStep] = useState(null);
-  // The single mode currently driving the shared audio engine. This mirrors
-  // activeMetronomeMode for the Master tab and prevents step callbacks from
-  // falling back to whichever accordion happens to be open.
-  const [activeTrainingMode, setActiveTrainingMode] = useState(null);
 
   // Practice Session State (Shared across all 4 steps with actual elapsed tracking)
   const [practiceSession, setPracticeSession] = useState({
@@ -569,7 +513,6 @@ export default function App() {
     selectedCategory: 'Alternate Picking',
     step1: {
       bpm: 75,
-      measuredBpm: 75,
       durationMinutes: 5,
       remainingSeconds: 300,
       elapsedSeconds: 0,
@@ -580,7 +523,6 @@ export default function App() {
     },
     step2: {
       bpm: 110,
-      measuredBpm: 110,
       durationMinutes: 5,
       remainingSeconds: 300,
       elapsedSeconds: 0,
@@ -591,7 +533,6 @@ export default function App() {
     },
     step3: {
       bpm: 125,
-      measuredBpm: 125,
       durationMinutes: 4,
       remainingSeconds: 240,
       elapsedSeconds: 0,
@@ -613,13 +554,6 @@ export default function App() {
       recordedVideoBlobUrl: null
     }
   });
-
-  // Individual timer attempts. Legacy history remains untouched; these
-  // records are the verified source for newly tracked practice time.
-  const [practiceAttempts, setPracticeAttempts] = useState(() => {
-    try { return JSON.parse(localStorage.getItem('gps_practice_attempts') || '[]'); } catch { return []; }
-  });
-  const [currentPracticeDayId, setCurrentPracticeDayId] = useState(() => `practice-${Date.now()}`);
 
   const [customTagInput, setCustomTagInput] = useState('');
   const [isLogModalOpen, setIsLogModalOpen] = useState(false);
@@ -796,9 +730,9 @@ export default function App() {
 
   // Step 4 Session Log Form
   const [logFormData, setLogFormData] = useState({
-    targetBpm: '',
-    pointsOfFocusTomorrow: '',
-    additionalNotes: ''
+    targetBpm: 120,
+    pointsOfFocusTomorrow: 'Work on outside picking consistency.',
+    additionalNotes: 'Felt very relaxed at high tempo. Clean thumb anchor.'
   });
 
   // Tap tempo state
@@ -896,17 +830,13 @@ export default function App() {
       // Check if user has already authenticated previously
       const savedAuthUser = localStorage.getItem('gps_auth_user');
       const isAuthFlag = localStorage.getItem('gps_is_authenticated');
-      const authExpiresAt = Number(localStorage.getItem('gps_auth_expires_at') || 0);
 
-      if (isAuthFlag === 'true' && savedAuthUser && authExpiresAt > Date.now()) {
+      if (isAuthFlag === 'true' && savedAuthUser) {
         setActiveUserId(savedAuthUser);
         setIsAuthenticated(true);
         loadUserData(savedAuthUser);
       } else {
         setIsAuthenticated(false);
-        localStorage.removeItem('gps_is_authenticated');
-        localStorage.removeItem('gps_auth_user');
-        localStorage.removeItem('gps_auth_expires_at');
       }
 
       // Restore active tab if previously saved
@@ -918,20 +848,6 @@ export default function App() {
       setIsAuthenticated(false);
     }
   }, []);
-
-  // Expire the authenticated profile after exactly 24 hours, even if the
-  // webpage remains open without a refresh.
-  useEffect(() => {
-    if (!isAuthenticated) return undefined;
-    const expiresAt = Number(localStorage.getItem('gps_auth_expires_at') || 0);
-    const remaining = expiresAt - Date.now();
-    if (remaining <= 0) {
-      handleLockStudio();
-      return undefined;
-    }
-    const expiryTimer = setTimeout(() => handleLockStudio(), remaining);
-    return () => clearTimeout(expiryTimer);
-  }, [isAuthenticated]);
 
   // Persist tab changes so refreshes stay on the active page
   const handleTabChange = (tabId) => {
@@ -969,7 +885,6 @@ export default function App() {
     try {
       localStorage.setItem('gps_is_authenticated', 'true');
       localStorage.setItem('gps_auth_user', selectedLoginUser);
-      localStorage.setItem('gps_auth_expires_at', String(Date.now() + 24 * 60 * 60 * 1000));
     } catch {}
 
     setLoginErrorMessage('');
@@ -984,7 +899,6 @@ export default function App() {
     try {
       localStorage.removeItem('gps_is_authenticated');
       localStorage.removeItem('gps_auth_user');
-      localStorage.removeItem('gps_auth_expires_at');
     } catch {}
     setSelectedLoginUser(null);
     setLoginPinInput('');
@@ -1287,37 +1201,7 @@ export default function App() {
     audioEngine.setSoundType(newType);
   };
 
-  const persistPracticeAttempts = (next) => {
-    setPracticeAttempts(next);
-    try { localStorage.setItem('gps_practice_attempts', JSON.stringify(next)); } catch {}
-  };
-
-  const finalizePracticeAttempt = (stepKey, status = 'manually_stopped') => {
-    const step = practiceSession[stepKey];
-    if (!step?.activeAttemptId || !(step.elapsedSeconds > 0)) return;
-    const record = {
-      id: step.activeAttemptId,
-      userId: activeUserId,
-      practiceDayId: currentPracticeDayId,
-      date: new Date().toISOString().slice(0, 10),
-      stepNumber: Number(stepKey.replace('step', '')),
-      stepName: stepKey,
-      startedAt: step.activeAttemptStartedAt,
-      endedAt: new Date().toISOString(),
-      actualElapsedSeconds: Math.max(0, Math.round(step.elapsedSeconds)),
-      configuredDurationSeconds: step.durationMinutes * 60,
-      bpm: step.bpmAtStart || step.bpm || null,
-      mode: step.modeAtStart || 'standard',
-      status
-    };
-    setPracticeAttempts(prev => {
-      const next = [...prev.filter(a => a.id !== record.id), record];
-      try { localStorage.setItem('gps_practice_attempts', JSON.stringify(next)); } catch {}
-      return next;
-    });
-  };
-
-  // Step Countdown Timers Heartbeat with actual active-time tracking.
+  // Step Countdown Timers Heartbeat with Time's Up trigger & Elapsed Tracker
   useEffect(() => {
     const timer = setInterval(() => {
       setPracticeSession(prev => {
@@ -1336,18 +1220,11 @@ export default function App() {
             if (next[stepKey].remainingSeconds > 0) {
               next[stepKey].remainingSeconds -= 1;
             } else {
-              const completedAttemptId = next[stepKey].activeAttemptId;
               next[stepKey] = {
                 ...next[stepKey],
                 isTimerRunning: false,
-                isCompleted: true,
-                activeAttemptId: null
+                isCompleted: true
               };
-              const completed = next[stepKey];
-              if (completedAttemptId && completed.elapsedSeconds > 0) {
-                const record = { id: completedAttemptId, userId: activeUserId, practiceDayId: currentPracticeDayId, date: new Date().toISOString().slice(0, 10), stepNumber: Number(stepKey.replace('step', '')), stepName: stepKey, startedAt: completed.activeAttemptStartedAt, endedAt: new Date().toISOString(), actualElapsedSeconds: Math.round(completed.elapsedSeconds), configuredDurationSeconds: completed.durationMinutes * 60, bpm: completed.bpmAtStart || completed.bpm || null, mode: completed.modeAtStart || 'standard', status: 'completed' };
-                setPracticeAttempts(prev => { const nextAttempts = [...prev.filter(a => a.id !== record.id), record]; try { localStorage.setItem('gps_practice_attempts', JSON.stringify(nextAttempts)); } catch {} return nextAttempts; });
-              }
               finishedStep = stepKey;
             }
           }
@@ -1387,16 +1264,6 @@ export default function App() {
     };
   }, [isManualTimerRunning]);
 
-  // Persist the manual tracker continuously. A refresh restores the last
-  // verified value but intentionally does not resume counting in the background.
-  useEffect(() => {
-    try {
-      localStorage.setItem('gps_manual_practice_seconds', String(manualPracticeSeconds));
-      if (manualTimerStartTime) localStorage.setItem('gps_manual_practice_start', manualTimerStartTime);
-      else localStorage.removeItem('gps_manual_practice_start');
-    } catch {}
-  }, [manualPracticeSeconds, manualTimerStartTime]);
-
   // Format seconds to HH:MM:SS or MM:SS helper
   const formatStopwatchTime = (totalSeconds) => {
     const hours = Math.floor(totalSeconds / 3600);
@@ -1425,10 +1292,16 @@ export default function App() {
 
   const handleFinishManualSession = () => {
     setIsManualTimerRunning(false);
-    const entry = { id: `manual-${Date.now()}`, userId: activeUserId, date: new Date().toISOString().slice(0, 10), actualSeconds: manualPracticeSeconds };
-    setManualPracticeLogs(prev => { const next = [...prev, entry]; try { localStorage.setItem('gps_manual_practice_logs', JSON.stringify(next)); } catch {} return next; });
-    setManualPracticeSeconds(0);
-    setManualTimerStartTime(null);
+    // If we have at least 15 seconds, map it to minutes and open the log modal
+    const elapsedMinutes = Math.max(1, Math.round(manualPracticeSeconds / 60));
+    setPracticeSession(prev => ({
+      ...prev,
+      step1: { ...prev.step1, elapsedSeconds: Math.round(manualPracticeSeconds * 0.3) },
+      step2: { ...prev.step2, elapsedSeconds: Math.round(manualPracticeSeconds * 0.4) },
+      step3: { ...prev.step3, elapsedSeconds: Math.round(manualPracticeSeconds * 0.2) },
+      step4: { ...prev.step4, elapsedSeconds: Math.round(manualPracticeSeconds * 0.1) }
+    }));
+    setIsLogModalOpen(true);
     audioEngine.playUiSound('step');
   };
 
@@ -1488,8 +1361,6 @@ export default function App() {
 
   const stopAllMetronomes = () => {
     audioEngine.stop();
-    setActiveTrainingStep(null);
-    setActiveTrainingMode(null);
     setIsPlaying(false);
     setIsBurstActive(false);
     setBurstCountRemaining(0);
@@ -1544,25 +1415,18 @@ export default function App() {
     audioEngine.setSubdivision(SUBDIVISIONS[0]);
   };
 
-  const startSpeedTraining = (stepNumber = null) => {
-    setActiveTrainingStep(stepNumber);
-    setActiveTrainingMode('speed');
-    if (stepNumber) setCurrentStepOpen(stepNumber);
-    const trainingSubdivision = stepNumber
-      ? (practiceSession[`step${stepNumber}`]?.subdivision || SUBDIVISIONS[0])
-      : selectedSubdivision;
+  const startSpeedTraining = () => {
     const totalSteps = Math.max(1, Math.ceil((speedConfig.endBpm - speedConfig.startBpm) / speedConfig.bpmIncrement) + 1);
     const hasCountIn = speedConfig.countInEnabled && speedConfig.initialCountIn > 0;
     audioEngine.stop();
     if (hasCountIn) configureQuarterNoteCountIn(speedConfig.initialCountIn);
     else {
       audioEngine.setTimeSignature(speedConfig.timeSignature);
-      audioEngine.setSubdivision(trainingSubdivision);
+      audioEngine.setSubdivision(selectedSubdivision);
     }
     audioEngine.setBpm(speedConfig.startBpm);
     audioEngine.start();
     setIsPlaying(true);
-    if (stepNumber) setPracticeSession(prev => ({ ...prev, [`step${stepNumber}`]: { ...prev[`step${stepNumber}`], measuredBpm: speedConfig.startBpm } }));
 
     setSpeedProgress({
       currentBpm: speedConfig.startBpm,
@@ -1595,16 +1459,11 @@ export default function App() {
 
   const stopSpeedTraining = () => {
     audioEngine.stop();
-    setActiveTrainingStep(null);
-    setActiveTrainingMode(null);
     setIsPlaying(false);
     setSpeedProgress(prev => ({ ...prev, isActive: false, isPaused: false, stage: 'idle' }));
   };
 
-  const startRatiosTraining = (stepNumber = null) => {
-    setActiveTrainingStep(stepNumber);
-    setActiveTrainingMode('ratios');
-    if (stepNumber) setCurrentStepOpen(stepNumber);
+  const startRatiosTraining = () => {
     const hasCountIn = ratiosConfig.countInEnabled && ratiosConfig.initialCountIn > 0;
     audioEngine.stop();
     if (hasCountIn) configureQuarterNoteCountIn(ratiosConfig.initialCountIn);
@@ -1615,7 +1474,6 @@ export default function App() {
     audioEngine.setBpm(ratiosConfig.bpm);
     audioEngine.start();
     setIsPlaying(true);
-    if (stepNumber) setPracticeSession(prev => ({ ...prev, [`step${stepNumber}`]: { ...prev[`step${stepNumber}`], measuredBpm: ratiosConfig.bpm } }));
 
     setRatiosProgress({
       activeLoop: 1,
@@ -1645,8 +1503,6 @@ export default function App() {
 
   const stopRatiosTraining = () => {
     audioEngine.stop();
-    setActiveTrainingStep(null);
-    setActiveTrainingMode(null);
     setIsPlaying(false);
     setRatiosProgress(prev => ({
       ...prev,
@@ -1662,7 +1518,7 @@ export default function App() {
   useEffect(() => {
     audioEngine.onBeat = (beatNumber, isBarStart) => {
       const currentMode = activeTab === 'daily'
-        ? (activeTrainingMode || (currentStepOpen === 1 ? step1SubTab : currentStepOpen === 2 ? step2SubTab : step3SubTab))
+        ? (currentStepOpen === 1 ? step1SubTab : currentStepOpen === 2 ? step2SubTab : step3SubTab)
         : activeMetronomeMode;
 
       if (currentMode === 'speed' && speedProgress.isActive && !speedProgress.isPaused) {
@@ -1679,17 +1535,8 @@ export default function App() {
               s.currentBeat = 1;
               s.currentBar = 1;
               s.currentLoop = 1;
-              // The lookahead scheduler may already have queued the next
-              // count-in click. Restart at the boundary so it cannot leak
-              // one extra quarter-note before the real exercise begins.
-              audioEngine.stop();
               audioEngine.setTimeSignature(speedConfig.timeSignature);
-              const trainingSubdivision = activeTrainingStep
-                ? (practiceSession[`step${activeTrainingStep}`]?.subdivision || SUBDIVISIONS[0])
-                : selectedSubdivision;
-              audioEngine.setSubdivision(trainingSubdivision);
-              audioEngine.setBpm(s.currentBpm);
-              audioEngine.start();
+              audioEngine.setSubdivision(selectedSubdivision);
               return s;
             }
           }
@@ -1727,7 +1574,6 @@ export default function App() {
                   return s;
                 } else {
                   s.currentBpm = Math.min(speedConfig.endBpm, nextStageBpm);
-                  if (activeTrainingStep) setPracticeSession(prev => ({ ...prev, [`step${activeTrainingStep}`]: { ...prev[`step${activeTrainingStep}`], measuredBpm: s.currentBpm } }));
                   audioEngine.setBpm(s.currentBpm);
                   if (speedConfig.countInEnabled && speedConfig.speedIncreaseCountIn > 0) {
                     s.stage = 'increasing';
@@ -1756,12 +1602,8 @@ export default function App() {
               r.currentBeat = 1;
               r.activeLoop = 1;
               r.currentSubdivision = ratiosConfig.loop1;
-              // Clear the lookahead queue at the exact count-in boundary.
-              audioEngine.stop();
               audioEngine.setTimeSignature({ beats: ratiosConfig.numberOfBeats, noteValue: 4 });
               audioEngine.setSubdivision(ratiosConfig.loop1);
-              audioEngine.setBpm(ratiosConfig.bpm);
-              audioEngine.start();
               return r;
             }
           }
@@ -1806,7 +1648,7 @@ export default function App() {
     };
   }, [
     activeTab, currentStepOpen, step1SubTab, step2SubTab, step3SubTab,
-    activeMetronomeMode, activeTrainingMode, activeTrainingStep, practiceSession, speedConfig, speedProgress.isActive, speedProgress.isPaused,
+    activeMetronomeMode, speedConfig, speedProgress.isActive, speedProgress.isPaused,
     ratiosConfig, ratiosProgress.isActive, ratiosProgress.isPaused
   ]);
 
@@ -1838,20 +1680,14 @@ export default function App() {
     return () => cancelAnimationFrame(animId);
   }, []);
 
-  const togglePlay = (targetBpm = bpm, targetSubdiv = selectedSubdivision, stepNumber = null) => {
+  const togglePlay = (targetBpm = bpm, targetSubdiv = selectedSubdivision) => {
     if (isPlaying) {
       audioEngine.stop();
       setIsPlaying(false);
       setIsBurstActive(false);
-      setActiveTrainingStep(null);
-      setActiveTrainingMode(null);
     } else {
-      if (stepNumber) setActiveTrainingStep(stepNumber);
-      else {
-        setBpm(targetBpm);
-        setSelectedSubdivision(targetSubdiv);
-      }
-      setActiveTrainingMode('standard');
+      setBpm(targetBpm);
+      setSelectedSubdivision(targetSubdiv);
       audioEngine.setBpm(targetBpm);
       audioEngine.setSubdivision(targetSubdiv);
       audioEngine.setTimeSignature(timeSignature);
@@ -1880,7 +1716,7 @@ export default function App() {
     }, totalDurationMs);
   };
 
-  const handleTapTempo = (stepNumber = null) => {
+  const handleTapTempo = () => {
     const now = performance.now();
     const times = tapTimesRef.current;
     if (times.length > 0 && now - times[times.length - 1] > 2000) {
@@ -1897,40 +1733,31 @@ export default function App() {
       const avgInterval = intervals.reduce((a, b) => a + b) / intervals.length;
       const calculatedBpm = Math.round(60000 / avgInterval);
       const clamped = Math.max(30, Math.min(320, calculatedBpm));
-      if (stepNumber) updateStepBpm(stepNumber, clamped);
-      else setBpm(clamped);
+      setBpm(clamped);
       audioEngine.setBpm(clamped);
     }
   };
 
   const toggleTimer = (stepKey) => {
-    setPracticeSession(prev => {
-      const step = prev[stepKey];
-      const startingNewAttempt = !step.isTimerRunning && !step.activeAttemptId;
-      const stepNumber = Number(stepKey.replace('step', ''));
-      const selectedMode = stepNumber === 1 ? step1SubTab : stepNumber === 2 ? step2SubTab : step3SubTab;
-      return { ...prev, [stepKey]: { ...step, isTimerRunning: !step.isTimerRunning, activeAttemptId: startingNewAttempt ? `attempt-${Date.now()}-${stepKey}` : step.activeAttemptId, activeAttemptStartedAt: startingNewAttempt ? new Date().toISOString() : step.activeAttemptStartedAt, bpmAtStart: startingNewAttempt ? getStepEffectiveBpm(stepNumber) : step.bpmAtStart, modeAtStart: startingNewAttempt ? selectedMode : step.modeAtStart } };
-    });
+    setPracticeSession(prev => ({
+      ...prev,
+      [stepKey]: {
+        ...prev[stepKey],
+        isTimerRunning: !prev[stepKey].isTimerRunning
+      }
+    }));
   };
 
   const resetTimer = (stepKey) => {
-    finalizePracticeAttempt(stepKey, 'manually_stopped');
     setPracticeSession(prev => ({
       ...prev,
       [stepKey]: {
         ...prev[stepKey],
         isTimerRunning: false,
         remainingSeconds: prev[stepKey].durationMinutes * 60,
-        elapsedSeconds: 0,
-        activeAttemptId: null,
-        activeAttemptStartedAt: null
+        elapsedSeconds: 0
       }
     }));
-  };
-
-  const stopTimer = (stepKey) => {
-    finalizePracticeAttempt(stepKey, 'manually_stopped');
-    setPracticeSession(prev => ({ ...prev, [stepKey]: { ...prev[stepKey], isTimerRunning: false, activeAttemptId: null, activeAttemptStartedAt: null } }));
   };
 
   const handleTimerDurationChange = (stepKey, mins) => {
@@ -1966,7 +1793,7 @@ export default function App() {
     const stepKey = `step${stepNum}`;
     setPracticeSession(prev => ({
       ...prev,
-      [stepKey]: { ...prev[stepKey], bpm: clamped, measuredBpm: clamped }
+      [stepKey]: { ...prev[stepKey], bpm: clamped }
     }));
     if (isPlaying) {
       audioEngine.setBpm(clamped);
@@ -2100,60 +1927,30 @@ export default function App() {
       }
     }));
 
-    setLogFormData({ targetBpm: '', pointsOfFocusTomorrow: '', additionalNotes: '' });
+    setLogFormData(prev => ({
+      ...prev,
+      targetBpm: Math.min(320, ex.currentBpm + 5)
+    }));
 
     handleTabChange('daily');
     setCurrentStepOpen(1);
     updateStepBpm(1, comfortTempo);
   };
 
-  // The header and session log must report the tempo actually being heard,
-  // not the step's original standard-metronome target.
-  const getStepEffectiveBpm = (stepNumber) => {
-    const stepKey = `step${stepNumber}`;
-    const selectedStepMode = stepNumber === 1 ? step1SubTab : stepNumber === 2 ? step2SubTab : step3SubTab;
-    const mode = activeTrainingStep === stepNumber ? activeTrainingMode : selectedStepMode;
-    if (mode === 'speed') {
-      return speedProgress.isActive ? speedProgress.currentBpm : speedConfig.startBpm;
-    }
-    if (mode === 'ratios') {
-      return ratiosConfig.bpm;
-    }
-    return practiceSession[stepKey]?.measuredBpm || practiceSession[stepKey]?.bpm || 80;
-  };
-
-  const hasCurrentStepPractice = (stepNumber) => {
-    const step = practiceSession[`step${stepNumber}`];
-    return Number(step?.elapsedSeconds || 0) > 0 || practiceAttempts.some(a => a.userId === activeUserId && a.practiceDayId === currentPracticeDayId && Number(a.stepNumber) === stepNumber && Number(a.actualElapsedSeconds) > 0);
-  };
-
-  const hasLoggedStepPractice = (session, stepNumber) => {
-    const elapsed = Number(session?.[`step${stepNumber}Elapsed`] || 0);
-    const attempts = Array.isArray(session?.practiceAttempts) && session.practiceAttempts.some(a => Number(a.stepNumber) === stepNumber && Number(a.actualElapsedSeconds) > 0);
-    return elapsed > 0 || attempts;
-  };
-
   const handleSaveSession = () => {
-    // Configured duration is only a target. History uses recorded active time.
-    const calcMinutes = (sec) => Math.ceil(Math.max(0, Number(sec) || 0) / 60);
-    const s1Elapsed = calcMinutes(practiceSession.step1.elapsedSeconds);
-    const s2Elapsed = calcMinutes(practiceSession.step2.elapsedSeconds);
-    const s3Elapsed = calcMinutes(practiceSession.step3.elapsedSeconds);
-    const s4Elapsed = calcMinutes(practiceSession.step4.elapsedSeconds);
+    const calcMinutes = (sec, planMins) => (sec > 30 ? Math.ceil(sec / 60) : planMins);
+    const s1Elapsed = calcMinutes(practiceSession.step1.elapsedSeconds, practiceSession.step1.durationMinutes);
+    const s2Elapsed = calcMinutes(practiceSession.step2.elapsedSeconds, practiceSession.step2.durationMinutes);
+    const s3Elapsed = calcMinutes(practiceSession.step3.elapsedSeconds, practiceSession.step3.durationMinutes);
+    const s4Elapsed = calcMinutes(practiceSession.step4.elapsedSeconds, practiceSession.step4.durationMinutes);
     const totalDuration = s1Elapsed + s2Elapsed + s3Elapsed + s4Elapsed;
-    const todayForAttempts = new Date().toISOString().slice(0, 10);
-    const verifiedSecondsForStep = (stepNumber) => practiceAttempts.filter(a => a.userId === activeUserId && Number(a.stepNumber) === stepNumber && (a.date || a.practiceDayId) === todayForAttempts).reduce((sum, a) => sum + Number(a.actualElapsedSeconds || 0), 0);
-    const isStep1Practiced = verifiedSecondsForStep(1) > 0 || practiceSession.step1.elapsedSeconds > 0;
-    const isStep2Practiced = verifiedSecondsForStep(2) > 0 || practiceSession.step2.elapsedSeconds > 0;
-    const isStep3Practiced = verifiedSecondsForStep(3) > 0 || practiceSession.step3.elapsedSeconds > 0;
-    const newSessionId = `session-${Date.now()}`;
 
     const todayStr = new Date().toISOString().split('T')[0];
     const exerciseName = practiceSession.selectedExerciseName || 'Custom / Free Practice Routine';
     const exerciseCategory = practiceSession.selectedCategory || 'Technique';
 
     const newSession = {
-      id: newSessionId,
+      id: `session-${Date.now()}`,
       userId: activeUserId,
       date: todayStr,
       exerciseId: practiceSession.selectedExerciseId,
@@ -2164,11 +1961,11 @@ export default function App() {
       step2Elapsed: s2Elapsed,
       step3Elapsed: s3Elapsed,
       step4Elapsed: s4Elapsed,
-      comfortBpm: isStep1Practiced ? getStepEffectiveBpm(1) : null,
-      edgeBpm: isStep2Practiced ? getStepEffectiveBpm(2) : null,
-      burstBpm: isStep3Practiced ? getStepEffectiveBpm(3) : null,
-      targetBpm: logFormData.targetBpm === '' ? null : Number(logFormData.targetBpm),
-      notes: [logFormData.pointsOfFocusTomorrow, logFormData.additionalNotes].filter(Boolean).join(' | '),
+      comfortBpm: practiceSession.step1.bpm,
+      edgeBpm: practiceSession.step2.bpm,
+      burstBpm: practiceSession.step3.bpm,
+      targetBpm: Number(logFormData.targetBpm) || (practiceSession.step2.bpm + 5),
+      notes: `${logFormData.pointsOfFocusTomorrow} | ${logFormData.additionalNotes}`,
       step1Focus: practiceSession.step1.focusAreas,
       step2Focus: practiceSession.step2.focusAreas,
       step3Focus: practiceSession.step3.focusAreas,
@@ -2176,15 +1973,8 @@ export default function App() {
       completedSteps: 4,
       videoUrl: practiceSession.step4.recordedVideoBlobUrl || recordedVideoUrl || null
     };
-    newSession.practiceAttempts = practiceAttempts.filter(a => a.userId === activeUserId && a.practiceDayId === currentPracticeDayId && Number(a.actualElapsedSeconds) > 0);
 
     setHistorySessions(prev => [newSession, ...prev]);
-    setPracticeAttempts(prev => {
-      const next = prev.filter(attempt => attempt.practiceDayId !== currentPracticeDayId);
-      try { localStorage.setItem('gps_practice_attempts', JSON.stringify(next)); } catch {}
-      return next;
-    });
-    setCurrentPracticeDayId(`practice-${Date.now()}-next`);
 
     let updatedExercises = exercises;
     if (practiceSession.selectedExerciseId && practiceSession.selectedExerciseId !== 'custom') {
@@ -2218,9 +2008,9 @@ export default function App() {
     // 4. Mark all steps as complete in active session state
     setPracticeSession(prev => ({
       ...prev,
-      step1: { ...prev.step1, isCompleted: isStep1Practiced, isTimerRunning: false, remainingSeconds: prev.step1.durationMinutes * 60, elapsedSeconds: 0, activeAttemptId: null, activeAttemptStartedAt: null },
-      step2: { ...prev.step2, isCompleted: isStep2Practiced, isTimerRunning: false, remainingSeconds: prev.step2.durationMinutes * 60, elapsedSeconds: 0, activeAttemptId: null, activeAttemptStartedAt: null },
-      step3: { ...prev.step3, isCompleted: isStep3Practiced, isTimerRunning: false, remainingSeconds: prev.step3.durationMinutes * 60, elapsedSeconds: 0, activeAttemptId: null, activeAttemptStartedAt: null },
+      step1: { ...prev.step1, isCompleted: true, elapsedSeconds: 0 },
+      step2: { ...prev.step2, isCompleted: true, elapsedSeconds: 0 },
+      step3: { ...prev.step3, isCompleted: true, elapsedSeconds: 0 },
       step4: { ...prev.step4, isCompleted: true, elapsedSeconds: 0 }
     }));
 
@@ -2366,47 +2156,6 @@ export default function App() {
     </div>
   );
 
-  const renderStepAttemptHistory = (stepNumber, accentColor) => {
-    const attempts = practiceAttempts.filter(a => Number(a.stepNumber) === stepNumber && a.userId === activeUserId && a.practiceDayId === currentPracticeDayId && Number(a.actualElapsedSeconds) > 0);
-    if (!attempts.length) return null;
-    return (
-      <div className="mt-3 rounded-xl bg-[#101016] border border-white/5 p-3">
-        <div className="text-[10px] uppercase tracking-wider font-bold text-[#92929F] mb-2">Recorded practice sessions</div>
-        <div className="flex gap-2 overflow-x-auto pb-1">
-          {attempts.map((attempt, index) => {
-            const seconds = Math.max(0, Number(attempt.actualElapsedSeconds) || 0);
-            return <div key={attempt.id} className="min-w-[145px] rounded-lg border p-2.5 flex-shrink-0" style={{ borderColor: `${accentColor}55`, backgroundColor: `${accentColor}10` }}><div className="text-[10px] font-bold" style={{ color: accentColor }}>SESSION {index + 1}</div><div className="text-sm font-mono font-bold text-white mt-1">{Math.floor(seconds / 60)}:{String(seconds % 60).padStart(2, '0')}</div><div className="text-[9px] text-[#92929F] mt-1">{attempt.bpm ? `${attempt.bpm} BPM` : 'BPM not recorded'}</div><div className="text-[9px] text-[#92929F] capitalize">{attempt.mode === 'speed' ? 'Speed Training' : attempt.mode === 'ratios' ? 'Ratios Training' : 'Metronome'}</div></div>;
-          })}
-        </div>
-      </div>
-    );
-  };
-
-  const renderVerifiedHistoryBreakdown = (onlyDate = null) => {
-    const grouped = practiceAttempts.filter(a => a.userId === activeUserId && Number(a.actualElapsedSeconds) > 0 && (!onlyDate || (a.date || a.practiceDayId) === onlyDate)).reduce((acc, attempt) => {
-      const date = attempt.date || attempt.practiceDayId || 'Unspecified Date';
-      (acc[date] ||= []).push(attempt);
-      return acc;
-    }, {});
-    const dates = Object.keys(grouped).sort((a, b) => b.localeCompare(a));
-    if (!dates.length) return null;
-    const colors = { 1: '#10B981', 2: '#3B82F6', 3: '#EF4444' };
-    return <div className="space-y-3 mb-5">{dates.map(date => {
-      const day = grouped[date];
-      const total = day.reduce((sum, a) => sum + Number(a.actualElapsedSeconds || 0), 0);
-      return <div key={date} className="rounded-2xl bg-[#101016] border border-white/5 p-3 sm:p-4"><div className="flex items-center justify-between mb-3"><span className="text-sm font-bold text-white font-mono">{date}</span><span className="text-xs font-mono font-bold" style={{ color: currentTheme.primary }}>{Math.floor(total / 60)}m {total % 60}s total</span></div><div className="space-y-2">{[1, 2, 3].map(step => { const rows = day.filter(a => Number(a.stepNumber) === step); const seconds = rows.reduce((sum, a) => sum + Number(a.actualElapsedSeconds || 0), 0); return <div key={step} className="rounded-xl border border-white/5 px-3 py-2"><div className="text-[10px] font-bold" style={{ color: rows.length ? colors[step] : '#666675' }}>STEP {step} {rows.length ? `· ${Math.floor(seconds / 60)}m ${seconds % 60}s` : '· SKIPPED'}</div>{rows.length ? <div className="flex flex-wrap gap-x-5 gap-y-1 mt-1">{rows.map((a, i) => <div key={a.id} className="text-[10px] text-[#B8B8C5]">Session {i + 1} <span className="font-mono text-white">{Math.floor(Number(a.actualElapsedSeconds) / 60)}:{String(Number(a.actualElapsedSeconds) % 60).padStart(2, '0')}</span></div>)}</div> : <div className="text-[10px] text-[#666675] mt-1">Not practised</div>}</div>; })}</div></div>;
-    })}</div>;
-  };
-
-  const renderAttemptsForPracticeLog = (practiceId, practiceDate, savedAttempts = null, compact = false) => {
-    const source = Array.isArray(savedAttempts) ? savedAttempts : practiceAttempts;
-    const linkedAttempts = source.filter(a => a.userId === activeUserId && a.practiceDayId === practiceId && Number(a.actualElapsedSeconds) > 0);
-    const attempts = linkedAttempts.length ? linkedAttempts : source.filter(a => a.userId === activeUserId && (a.practiceDayId === practiceDate || a.date === practiceDate) && Number(a.actualElapsedSeconds) > 0);
-    if (!attempts.length) return null;
-    const colors = { 1: '#10B981', 2: '#3B82F6', 3: '#EF4444' };
-    return <div className={compact ? 'space-y-1 mb-2 scale-[0.96] origin-top' : 'space-y-2.5 mb-4'}>{[1, 2, 3].filter(step => attempts.some(a => Number(a.stepNumber) === step)).map(step => { const rows = attempts.filter(a => Number(a.stepNumber) === step); const seconds = rows.reduce((sum, a) => sum + Number(a.actualElapsedSeconds || 0), 0); return <div key={step} className="rounded-2xl border border-white/[0.07] bg-[#101016]/70 px-4 py-3 shadow-sm"><div className="text-[10px] font-bold tracking-wide" style={{ color: colors[step] }}>STEP {step} · {Math.floor(seconds / 60)}m {seconds % 60}s</div><div className="flex flex-wrap gap-x-6 gap-y-2 mt-2">{rows.map((a, i) => <div key={a.id} className="text-[11px] text-[#B8B8C5] flex items-center gap-1.5"><span>Session {i + 1}</span><span className="font-mono font-semibold text-white">{Math.floor(Number(a.actualElapsedSeconds) / 60)}:{String(Number(a.actualElapsedSeconds) % 60).padStart(2, '0')}</span>{a.bpm ? <span className="text-[#92929F]">{a.bpm} BPM</span> : null}<span className="rounded-full bg-white/5 px-1.5 py-0.5 text-[9px] text-[#777786]">{a.mode === 'speed' ? 'Speed Training' : a.mode === 'ratios' ? 'Ratios Training' : 'Metronome'}</span></div>)}</div></div>; })}</div>;
-  };
-
   // ==========================================================================
   // RENDER: STEP METRONOME SUITE (Standard, Speed, and Ratios in Steps 1, 2, 3)
   // ==========================================================================
@@ -2479,7 +2228,7 @@ export default function App() {
                   -1
                 </button>
                 <button
-                  onClick={() => togglePlay(currentStepBpm, stepSubdiv, stepNumber)}
+                  onClick={() => togglePlay(currentStepBpm, stepSubdiv)}
                   className="flex-[2] sm:flex-none px-4 sm:px-8 py-2.5 sm:py-3 rounded-2xl text-xs sm:text-sm font-extrabold font-gx-display flex items-center justify-center gap-1.5 sm:gap-2 transition-all active:scale-95"
                   style={{
                     backgroundColor: isPlaying ? '#EF4444' : currentTheme.primary,
@@ -2516,38 +2265,6 @@ export default function App() {
                   style={{ accentColor: currentTheme.primary }}
                   className="w-full bg-[#1B1B25] h-2 sm:h-1.5 rounded-lg cursor-pointer"
                 />
-              </div>
-
-              {/* Master Studio controls shared by every embedded step metronome. */}
-              <div className="flex items-center justify-center gap-1.5 sm:gap-2 mt-3 flex-wrap">
-                {[60, 80, 100, 120, 140, 160].map(preset => (
-                  <button key={preset} onClick={() => updateStepBpm(stepNumber, preset)}
-                    className="px-2.5 py-1 rounded-lg text-[10px] sm:text-xs font-gx-num font-bold border transition-all"
-                    style={{ backgroundColor: currentStepBpm === preset ? currentTheme.primary : '#101016', borderColor: currentStepBpm === preset ? currentTheme.primary : 'rgba(255,255,255,.05)', color: currentStepBpm === preset ? '#fff' : '#92929F' }}>
-                    {preset}
-                  </button>
-                ))}
-              </div>
-
-              <div className="w-full max-w-md mt-3 flex items-center justify-between gap-2 flex-wrap">
-                <button onClick={() => handleTapTempo(stepNumber)} className="px-3 py-1.5 rounded-xl bg-[#1B1B25] border border-white/10 text-[10px] font-bold" style={{ color: currentTheme.primary }}>
-                  TAP TEMPO
-                </button>
-                <div className="flex items-center gap-1 bg-[#101016] px-2 py-1 rounded-xl border border-white/5">
-                  <span className="text-[10px] text-[#92929F]">CLICK</span>
-                  <select value={soundType} onChange={e => handleSoundTypeChange(e.target.value)} className="bg-transparent text-[10px] font-bold text-white focus:outline-none">
-                    <option value="woodblock" className="bg-[#15151D]">Woodblock</option>
-                    <option value="beep" className="bg-[#15151D]">Cyber Beep</option>
-                    <option value="rimshot" className="bg-[#15151D]">Tight Rimshot</option>
-                    <option value="mechanical" className="bg-[#15151D]">Mechanical</option>
-                  </select>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Volume2 className="w-4 h-4 text-[#92929F]" />
-                  <input type="range" min="0" max="1" step="0.05" value={volume}
-                    onChange={e => { const value = Number(e.target.value); setVolume(value); audioEngine.setVolume(value); }}
-                    style={{ accentColor: currentTheme.primary }} className="w-20 h-1.5 bg-[#1B1B25] rounded-lg cursor-pointer" />
-                </div>
               </div>
             </div>
 
@@ -2614,14 +2331,6 @@ export default function App() {
 
         {activeSubTab === 'speed' && (
           <div className="bg-[#15151D] border border-white/5 rounded-2xl p-3 sm:p-5 lg:p-6 shadow-xl space-y-3 w-full">
-            {!speedProgress.isActive && (
-              <div className="space-y-3 border-b border-white/5 pb-3">
-                <div className="text-center"><h3 className="text-sm font-bold text-white font-gx-display">Speed Training Setup</h3><p className="text-[10px] text-[#92929F] mt-1">Same progressive training controls as Master Studio Metronome.</p></div>
-                <div className="grid grid-cols-3 sm:grid-cols-6 gap-1.5">{TIME_SIGNATURES.map(ts => <button key={ts.id} onClick={() => setSpeedConfig(p => ({ ...p, timeSignature: ts }))} className="py-1.5 rounded-lg border text-[10px] font-bold" style={{ background: speedConfig.timeSignature.id === ts.id ? currentTheme.accentBg : '#101016', borderColor: speedConfig.timeSignature.id === ts.id ? currentTheme.primary : 'rgba(255,255,255,.07)', color: speedConfig.timeSignature.id === ts.id ? currentTheme.primary : '#92929F' }}>{ts.label}</button>)}</div>
-                <div className="grid sm:grid-cols-2 gap-2">{renderNumberSetting('Start BPM', speedConfig.startBpm, 30, 320, 1, v => setSpeedConfig(p => ({ ...p, startBpm: Math.min(v, p.endBpm) })))}{renderNumberSetting('End BPM', speedConfig.endBpm, 30, 320, 1, v => setSpeedConfig(p => ({ ...p, endBpm: Math.max(v, p.startBpm) })))}{renderNumberSetting('BPM Increment', speedConfig.bpmIncrement, 1, 20, 1, v => setSpeedConfig(p => ({ ...p, bpmIncrement: v })))}{renderNumberSetting('Bars / Loop', speedConfig.barsPerLoop, 1, 32, 1, v => setSpeedConfig(p => ({ ...p, barsPerLoop: v })))}{renderNumberSetting('Loops before increase', speedConfig.loopsBeforeIncrease, 1, 16, 1, v => setSpeedConfig(p => ({ ...p, loopsBeforeIncrease: v })))}</div>
-                <div className="rounded-xl bg-[#101016] border border-white/5 p-2.5"><label className="flex items-center justify-between text-xs text-white font-semibold">Count In <button type="button" onClick={() => setSpeedConfig(p => ({ ...p, countInEnabled: !p.countInEnabled }))} className="px-3 py-1 rounded-full text-[10px] font-bold" style={{ background: speedConfig.countInEnabled ? currentTheme.primary : '#30303D' }}>{speedConfig.countInEnabled ? 'ON' : 'OFF'}</button></label>{speedConfig.countInEnabled && <div className="grid sm:grid-cols-2 gap-2 mt-2">{renderNumberSetting('Initial Count In', speedConfig.initialCountIn, 0, 16, 1, v => setSpeedConfig(p => ({ ...p, initialCountIn: v })))}{renderNumberSetting('Speed ↑ Count In', speedConfig.speedIncreaseCountIn, 0, 16, 1, v => setSpeedConfig(p => ({ ...p, speedIncreaseCountIn: v })))}</div>}</div>
-              </div>
-            )}
             <div className="flex flex-col items-center justify-center pt-1 pb-1">
               <div className="text-6xl sm:text-8xl lg:text-9xl font-black font-gx-num tracking-tight text-white leading-none">
                 {speedProgress.isActive ? speedProgress.currentBpm : speedConfig.startBpm}
@@ -2632,13 +2341,9 @@ export default function App() {
             </div>
 
             {renderDotVisualiser(
-              speedProgress.stage === 'countin' || speedProgress.stage === 'increasing' ? SUBDIVISIONS[0] : stepSubdiv,
+              stepSubdiv,
               speedProgress.isActive ? speedProgress.currentBpm : speedConfig.startBpm,
-              speedProgress.stage === 'countin'
-                ? speedConfig.initialCountIn
-                : speedProgress.stage === 'increasing'
-                  ? speedConfig.speedIncreaseCountIn
-                  : speedConfig.timeSignature.beats
+              speedConfig.timeSignature.beats
             )}
 
             <div className="bg-[#101016] p-2.5 sm:p-3 rounded-xl border border-white/5 flex items-center justify-between flex-wrap gap-2 text-xs">
@@ -2672,7 +2377,7 @@ export default function App() {
             <div className="flex items-center justify-center gap-2 py-1 flex-wrap">
               {!speedProgress.isActive ? (
                 <button
-                  onClick={() => startSpeedTraining(stepNumber)}
+                  onClick={startSpeedTraining}
                   className="flex-1 sm:flex-none px-5 py-2.5 rounded-2xl text-white font-extrabold text-xs flex items-center justify-center gap-1.5 transition-all active:scale-95"
                   style={{
                     backgroundColor: currentTheme.primary,
@@ -2711,7 +2416,7 @@ export default function App() {
               )}
 
               <button
-                onClick={() => startSpeedTraining(stepNumber)}
+                onClick={startSpeedTraining}
                 className="px-3.5 py-2.5 rounded-2xl bg-[#1B1B25] border border-white/5 text-white font-semibold text-xs flex items-center gap-1 hover:bg-[#252533] hover:border-white/10 active:scale-95 transition-all"
               >
                 <RotateCcw className="w-3.5 h-3.5" />
@@ -2723,14 +2428,6 @@ export default function App() {
 
         {activeSubTab === 'ratios' && (
           <div className="bg-[#15151D] border border-white/5 rounded-2xl p-3 sm:p-5 lg:p-6 shadow-xl space-y-3 w-full">
-            {!ratiosProgress.isActive && (
-              <div className="space-y-3 border-b border-white/5 pb-3">
-                <div className="text-center"><h3 className="text-sm font-bold text-white font-gx-display">Ratios Training Setup</h3><p className="text-[10px] text-[#92929F] mt-1">Same subdivision, count-in, and loop controls as Master Studio Metronome.</p></div>
-                <div className="grid sm:grid-cols-2 gap-2">{renderNumberSetting('BPM', ratiosConfig.bpm, 30, 320, 1, v => setRatiosConfig(p => ({ ...p, bpm: v })))}{renderNumberSetting('# of Beats', ratiosConfig.numberOfBeats, 1, 16, 1, v => setRatiosConfig(p => ({ ...p, numberOfBeats: v })))}</div>
-                <div className="rounded-xl bg-[#101016] border border-white/5 p-2.5"><label className="flex items-center justify-between text-xs text-white font-semibold">Count In <button type="button" onClick={() => setRatiosConfig(p => ({ ...p, countInEnabled: !p.countInEnabled }))} className="px-3 py-1 rounded-full text-[10px] font-bold" style={{ background: ratiosConfig.countInEnabled ? currentTheme.primary : '#30303D' }}>{ratiosConfig.countInEnabled ? 'ON' : 'OFF'}</button></label>{ratiosConfig.countInEnabled && <div className="grid sm:grid-cols-2 gap-2 mt-2">{renderNumberSetting('Initial Count In', ratiosConfig.initialCountIn, 0, 16, 1, v => setRatiosConfig(p => ({ ...p, initialCountIn: v })))}{renderNumberSetting('Repeat Count In', ratiosConfig.repeatCountIn, 0, 16, 1, v => setRatiosConfig(p => ({ ...p, repeatCountIn: v })))}</div>}</div>
-                <div className="rounded-xl bg-[#101016] border border-white/5 p-2.5"><label className="flex items-center justify-between text-xs text-white font-semibold">Subdivision Ratio <button type="button" onClick={() => setRatiosConfig(p => ({ ...p, subdivisionRatioEnabled: !p.subdivisionRatioEnabled }))} className="px-3 py-1 rounded-full text-[10px] font-bold" style={{ background: ratiosConfig.subdivisionRatioEnabled ? currentTheme.primary : '#30303D' }}>{ratiosConfig.subdivisionRatioEnabled ? 'ON' : 'OFF'}</button></label>{ratiosConfig.subdivisionRatioEnabled && <div className="grid sm:grid-cols-2 gap-2 mt-2">{[['Loop 1', 'loop1'], ['Loop 2', 'loop2']].map(([label, key]) => <label key={key} className="text-[10px] text-[#92929F]">{label}<select value={ratiosConfig[key].id} onChange={e => setRatiosConfig(p => ({ ...p, [key]: SUBDIVISIONS.find(x => x.id === e.target.value) || p[key] }))} className="w-full p-2 rounded-lg bg-[#20202B] text-white border border-white/10 mt-1">{SUBDIVISIONS.filter(x => x.id !== 'quarter').map(x => <option key={x.id} value={x.id}>{x.name}</option>)}</select></label>)}</div>}</div>
-              </div>
-            )}
             <div className="flex flex-col items-center justify-center pt-1 pb-1">
               <div className="text-6xl sm:text-8xl lg:text-9xl font-black font-gx-num tracking-tight text-white leading-none">
                 {ratiosConfig.bpm}
@@ -2741,9 +2438,9 @@ export default function App() {
             </div>
 
             {renderDotVisualiser(
-              ratiosProgress.isCountIn ? SUBDIVISIONS[0] : (ratiosProgress.isActive ? ratiosProgress.currentSubdivision : ratiosConfig.loop1),
+              ratiosProgress.isActive ? ratiosProgress.currentSubdivision : ratiosConfig.loop1,
               ratiosConfig.bpm,
-              ratiosProgress.isCountIn ? ratiosProgress.countInTotal : ratiosConfig.numberOfBeats
+              ratiosConfig.numberOfBeats
             )}
 
             <div className="bg-[#101016] p-2.5 sm:p-3 rounded-xl border border-white/5 flex items-center justify-between flex-wrap gap-2 text-xs">
@@ -2797,7 +2494,7 @@ export default function App() {
 
               {!ratiosProgress.isActive ? (
                 <button
-                  onClick={() => startRatiosTraining(stepNumber)}
+                  onClick={startRatiosTraining}
                   className="flex-[2] sm:flex-none px-4 sm:px-6 py-2.5 rounded-2xl text-white font-extrabold text-xs flex items-center justify-center gap-1.5 transition-all active:scale-95"
                   style={{
                     backgroundColor: currentTheme.primary,
@@ -3468,7 +3165,7 @@ export default function App() {
                   <div>
                     <h3 className="text-sm sm:text-base lg:text-lg font-bold text-white font-mono flex items-center gap-2">
                       Step 1: Comfort Zone Warmup
-                      {hasCurrentStepPractice(1) && (
+                      {practiceSession.step1.isCompleted && (
                         <CheckCircle2 className="w-4 h-4 text-[#10B981]" />
                       )}
                     </h3>
@@ -3476,7 +3173,7 @@ export default function App() {
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
-                  <span className="text-xs sm:text-sm font-mono font-bold text-[#10B981]">{getStepEffectiveBpm(1)} BPM</span>
+                  <span className="text-xs sm:text-sm font-mono font-bold text-[#10B981]">{practiceSession.step1.bpm} BPM</span>
                   {currentStepOpen === 1 ? <ChevronUp className="w-4 h-4 text-[#92929F]" /> : <ChevronDown className="w-4 h-4 text-[#92929F]" />}
                 </div>
               </div>
@@ -3522,11 +3219,8 @@ export default function App() {
                       >
                         <RotateCcw className="w-3.5 h-3.5" />
                       </button>
-                      {(practiceSession.step1.activeAttemptId || practiceSession.step1.elapsedSeconds > 0) && <button onClick={() => stopTimer('step1')} className="px-2 py-1.5 rounded-lg bg-[#9F2636] text-white text-[10px] font-bold">Stop</button>}
                     </div>
                   </div>
-
-                  {renderStepAttemptHistory(1, '#10B981')}
 
                   <div>
                     <label className="text-[10px] sm:text-xs uppercase font-semibold text-[#92929F] mb-1.5 block">Focus Areas</label>
@@ -3568,7 +3262,7 @@ export default function App() {
                   <div>
                     <h3 className="text-sm sm:text-base lg:text-lg font-bold text-white font-mono flex items-center gap-2">
                       Step 2: Edge of Ability
-                      {hasCurrentStepPractice(2) && (
+                      {practiceSession.step2.isCompleted && (
                         <CheckCircle2 className="w-4 h-4 text-[#3B82F6]" />
                       )}
                     </h3>
@@ -3576,7 +3270,7 @@ export default function App() {
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
-                  <span className="text-xs sm:text-sm font-mono font-bold text-[#3B82F6]">{getStepEffectiveBpm(2)} BPM</span>
+                  <span className="text-xs sm:text-sm font-mono font-bold text-[#3B82F6]">{practiceSession.step2.bpm} BPM</span>
                   {currentStepOpen === 2 ? <ChevronUp className="w-4 h-4 text-[#92929F]" /> : <ChevronDown className="w-4 h-4 text-[#92929F]" />}
                 </div>
               </div>
@@ -3622,11 +3316,8 @@ export default function App() {
                       >
                         <RotateCcw className="w-3.5 h-3.5" />
                       </button>
-                      {(practiceSession.step2.activeAttemptId || practiceSession.step2.elapsedSeconds > 0) && <button onClick={() => stopTimer('step2')} className="px-2 py-1.5 rounded-lg bg-[#9F2636] text-white text-[10px] font-bold">Stop</button>}
                     </div>
                   </div>
-
-                  {renderStepAttemptHistory(2, '#3B82F6')}
 
                   <div>
                     <label className="text-[10px] sm:text-xs uppercase font-semibold text-[#92929F] mb-1.5 block">Focus Areas</label>
@@ -3668,7 +3359,7 @@ export default function App() {
                   <div>
                     <h3 className="text-sm sm:text-base lg:text-lg font-bold text-white font-mono flex items-center gap-2">
                       Step 3: Speed Bursts
-                      {hasCurrentStepPractice(3) && (
+                      {practiceSession.step3.isCompleted && (
                         <CheckCircle2 className="w-4 h-4 text-[#EF4444]" />
                       )}
                     </h3>
@@ -3676,7 +3367,7 @@ export default function App() {
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
-                  <span className="text-xs sm:text-sm font-mono font-bold text-[#EF4444]">{getStepEffectiveBpm(3)} BPM</span>
+                  <span className="text-xs sm:text-sm font-mono font-bold text-[#EF4444]">{practiceSession.step3.bpm} BPM</span>
                   {currentStepOpen === 3 ? <ChevronUp className="w-4 h-4 text-[#92929F]" /> : <ChevronDown className="w-4 h-4 text-[#92929F]" />}
                 </div>
               </div>
@@ -3722,7 +3413,6 @@ export default function App() {
                       >
                         <RotateCcw className="w-3.5 h-3.5" />
                       </button>
-                      {(practiceSession.step3.activeAttemptId || practiceSession.step3.elapsedSeconds > 0) && <button onClick={() => stopTimer('step3')} className="px-2 py-1.5 rounded-lg bg-[#9F2636] text-white text-[10px] font-bold">Stop</button>}
                     </div>
                   </div>
 
@@ -3752,8 +3442,6 @@ export default function App() {
                       </button>
                     </div>
                   </div>
-
-                  {renderStepAttemptHistory(3, '#EF4444')}
 
                   <div>
                     <label className="text-[10px] sm:text-xs uppercase font-semibold text-[#92929F] mb-1.5 block">Focus Areas</label>
@@ -4505,8 +4193,6 @@ export default function App() {
                 <div className="space-y-6 w-full">
                   {sortedDates.map(dateKey => {
                     const daySessions = groupedByDate[dateKey];
-                    const verifiedDaySeconds = practiceAttempts.filter(a => a.userId === activeUserId && (a.date || a.practiceDayId) === dateKey).reduce((sum, a) => sum + Number(a.actualElapsedSeconds || 0), 0);
-                    const manualDaySeconds = manualPracticeLogs.filter(log => log.userId === activeUserId && log.date === dateKey).reduce((sum, log) => sum + Number(log.actualSeconds || 0), 0);
                     const totalDayMinutes = daySessions.reduce((sum, s) => sum + (Number(s.totalDurationMinutes) || 0), 0);
                     const formattedDayTime = formatTotalTime(totalDayMinutes);
 
@@ -4536,10 +4222,6 @@ export default function App() {
 
                           {/* Summed Total Time Badge prominently placed next to the date */}
                           <div className="flex items-center gap-2 self-start sm:self-auto">
-                            <span className="text-xs uppercase font-mono font-bold text-[#92929F]">Instrument Time:</span>
-                            <div className="px-3 py-1 rounded-xl text-xs sm:text-sm font-mono font-black border" style={{ backgroundColor: 'rgba(59,130,246,0.10)', borderColor: 'rgba(59,130,246,0.45)', color: '#60A5FA' }}>
-                              {Math.floor(manualDaySeconds / 3600)}h {Math.floor((manualDaySeconds % 3600) / 60)}m {manualDaySeconds % 60}s
-                            </div>
                             <span className="text-xs uppercase font-mono font-bold text-[#92929F]">Total Day Time:</span>
                             <div
                               className="px-3 py-1 rounded-xl text-xs sm:text-sm font-mono font-black border flex items-center gap-1.5 shadow-lg"
@@ -4595,20 +4277,18 @@ export default function App() {
                                   </div>
                                 </div>
 
-                                  {renderAttemptsForPracticeLog(session.id, session.date, session.practiceAttempts)}
-
                                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 bg-[#101016] p-2.5 rounded-xl border border-white/5 mb-2.5 text-center">
                                   <div>
                                     <span className="text-[9px] text-[#92929F] uppercase font-semibold">Comfort</span>
-                                    <div className="text-xs font-bold font-mono text-[#10B981]">{hasLoggedStepPractice(session, 1) && session.comfortBpm != null ? `${session.comfortBpm} BPM` : <span className="text-[#666675]">—</span>}</div>
+                                    <div className="text-xs font-bold font-mono text-[#10B981]">{session.comfortBpm} BPM</div>
                                   </div>
                                   <div>
                                     <span className="text-[9px] text-[#92929F] uppercase font-semibold">Clean Edge</span>
-                                    <div className="text-xs font-bold font-mono text-[#3B82F6]">{hasLoggedStepPractice(session, 2) && session.edgeBpm != null ? `${session.edgeBpm} BPM` : <span className="text-[#666675]">—</span>}</div>
+                                    <div className="text-xs font-bold font-mono text-[#3B82F6]">{session.edgeBpm} BPM</div>
                                   </div>
                                   <div>
                                     <span className="text-[9px] text-[#92929F] uppercase font-semibold">Speed Bursts</span>
-                                    <div className="text-xs font-bold font-mono text-[#EF4444]">{hasLoggedStepPractice(session, 3) && session.burstBpm != null ? `${session.burstBpm} BPM` : <span className="text-[#666675]">—</span>}</div>
+                                    <div className="text-xs font-bold font-mono text-[#EF4444]">{session.burstBpm} BPM</div>
                                   </div>
                                   <div>
                                     <span className="text-[9px] text-[#92929F] uppercase font-semibold">Next Target</span>
@@ -4979,25 +4659,23 @@ export default function App() {
                           </span>
                         </div>
 
-                        {renderAttemptsForPracticeLog(log.id, log.date, log.practiceAttempts, true)}
-
                         {/* Tempo milestones for this session */}
                         <div className="grid grid-cols-4 gap-1.5 text-center text-[10px] bg-[#15151D] p-2 rounded-lg">
                           <div>
                             <span className="text-[#92929F] block">Comfort</span>
-                            <span className="font-bold text-[#10B981]">{hasLoggedStepPractice(log, 1) && log.comfortBpm != null ? `${log.comfortBpm} BPM` : '—'}</span>
+                            <span className="font-bold text-[#10B981]">{log.comfortBpm} BPM</span>
                           </div>
                           <div>
                             <span className="text-[#92929F] block">Edge</span>
-                            <span className="font-bold text-[#3B82F6]">{hasLoggedStepPractice(log, 2) && log.edgeBpm != null ? `${log.edgeBpm} BPM` : '—'}</span>
+                            <span className="font-bold text-[#3B82F6]">{log.edgeBpm} BPM</span>
                           </div>
                           <div>
                             <span className="text-[#92929F] block">Burst</span>
-                            <span className="font-bold text-[#EF4444]">{hasLoggedStepPractice(log, 3) && log.burstBpm != null ? `${log.burstBpm} BPM` : '—'}</span>
+                            <span className="font-bold text-[#EF4444]">{log.burstBpm} BPM</span>
                           </div>
                           <div>
                             <span className="text-[#92929F] block">Next Goal</span>
-                            <span className="font-bold" style={{ color: currentTheme.primary }}>{log.targetBpm != null ? `${log.targetBpm} BPM` : '—'}</span>
+                            <span className="font-bold" style={{ color: currentTheme.primary }}>{log.targetBpm} BPM</span>
                           </div>
                         </div>
 
@@ -5183,7 +4861,7 @@ export default function App() {
                 <input
                   type="number"
                   value={logFormData.targetBpm}
-                  onChange={(e) => setLogFormData({ ...logFormData, targetBpm: e.target.value })}
+                  onChange={(e) => setLogFormData({ ...logFormData, targetBpm: Number(e.target.value) })}
                   className="w-full bg-[#101016] border border-white/10 rounded-xl px-3 py-2 text-xs text-white mt-1 font-mono"
                 />
               </div>
