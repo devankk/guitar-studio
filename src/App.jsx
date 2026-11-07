@@ -6,7 +6,7 @@ import {
   HelpCircle, ChevronDown, ChevronUp, Music, ArrowUp, ArrowDown,
   Square, Download, Upload, Trash2, Award, Flame, Target, Compass,
   Menu, X, Film, CheckCircle2, TrendingUp, Palette, ShieldCheck, Keyboard,
-  Cloud, CloudCheck, RefreshCcw, User, Users, Lock, Unlock, KeyRound,
+  Cloud, RefreshCcw, User, Users, Lock, Unlock, KeyRound,
   LogOut, ShieldAlert, Timer
 } from 'lucide-react';
 
@@ -88,6 +88,9 @@ class WebAudioEngine {
     this.timerId = null;
     this.scheduledEvents = [];
     this.onBeat = null;
+    this.beatTimers = new Set();
+    this.pauseTimeRemaining = null;
+    this.runToken = 0;
   }
 
   initAudio() {
@@ -177,8 +180,16 @@ class WebAudioEngine {
       this.currentSubdivision = 0;
       this.currentBeat = (this.currentBeat + 1) % this.timeSignature.beats;
 
-      if (this.onBeat) {
-        this.onBeat(this.currentBeat + 1, this.currentBeat === 0);
+      if (this.onBeat && this.audioCtx) {
+        const token = this.runToken;
+        const delay = Math.max(0, (this.nextNoteTime - this.audioCtx.currentTime) * 1000);
+        const timer = setTimeout(() => {
+          this.beatTimers.delete(timer);
+          if (this.isPlaying && token === this.runToken && this.onBeat) {
+            this.onBeat(this.currentBeat + 1, this.currentBeat === 0);
+          }
+        }, delay);
+        this.beatTimers.add(timer);
       }
     }
   }
@@ -258,9 +269,15 @@ class WebAudioEngine {
     this.initAudio();
     if (this.isPlaying) return;
     this.isPlaying = true;
-    this.currentBeat = 0;
-    this.currentSubdivision = 0;
-    this.nextNoteTime = this.audioCtx.currentTime + 0.04;
+    this.runToken++;
+    if (this.pauseTimeRemaining !== null) {
+      this.nextNoteTime = this.audioCtx.currentTime + Math.max(0.02, this.pauseTimeRemaining);
+      this.pauseTimeRemaining = null;
+    } else {
+      this.currentBeat = 0;
+      this.currentSubdivision = 0;
+      this.nextNoteTime = this.audioCtx.currentTime + 0.04;
+    }
     this.scheduledEvents = [];
 
     this.timerId = setInterval(() => {
@@ -270,8 +287,23 @@ class WebAudioEngine {
     }, this.lookahead);
   }
 
+  pause() {
+    if (!this.isPlaying) return;
+    this.pauseTimeRemaining = this.audioCtx ? Math.max(0.02, this.nextNoteTime - this.audioCtx.currentTime) : 0.04;
+    this.isPlaying = false;
+    this.runToken++;
+    if (this.timerId) { clearInterval(this.timerId); this.timerId = null; }
+    this.scheduledEvents = [];
+    this.beatTimers.forEach(clearTimeout);
+    this.beatTimers.clear();
+  }
+
   stop() {
     this.isPlaying = false;
+    this.runToken++;
+    this.pauseTimeRemaining = null;
+    this.beatTimers.forEach(clearTimeout);
+    this.beatTimers.clear();
     if (this.timerId) {
       clearInterval(this.timerId);
       this.timerId = null;
@@ -588,6 +620,7 @@ export default function App() {
     currentSubdivision: SUBDIVISIONS[1],
     currentBeat: 1,
     countInRemaining: 4,
+    countInTotal: 4,
     isCountIn: false,
     isActive: false,
     isPaused: false
@@ -1375,16 +1408,26 @@ export default function App() {
     }
   };
 
+  // Count-ins always use a straight quarter-note pulse. The configured count
+  // is the exact number of quarter-note beats, independent of the exercise meter.
+  const configureQuarterNoteCountIn = (beatCount) => {
+    audioEngine.setTimeSignature({ beats: Math.max(1, Number(beatCount) || 1), noteValue: 4 });
+    audioEngine.setSubdivision(SUBDIVISIONS[0]);
+  };
+
   const startSpeedTraining = () => {
-    const totalSteps = Math.floor((speedConfig.endBpm - speedConfig.startBpm) / speedConfig.bpmIncrement) + 1;
+    const totalSteps = Math.max(1, Math.ceil((speedConfig.endBpm - speedConfig.startBpm) / speedConfig.bpmIncrement) + 1);
+    const hasCountIn = speedConfig.countInEnabled && speedConfig.initialCountIn > 0;
     audioEngine.stop();
-    audioEngine.setTimeSignature(speedConfig.timeSignature);
-    audioEngine.setSubdivision(selectedSubdivision);
+    if (hasCountIn) configureQuarterNoteCountIn(speedConfig.initialCountIn);
+    else {
+      audioEngine.setTimeSignature(speedConfig.timeSignature);
+      audioEngine.setSubdivision(selectedSubdivision);
+    }
     audioEngine.setBpm(speedConfig.startBpm);
     audioEngine.start();
     setIsPlaying(true);
 
-    const hasCountIn = speedConfig.countInEnabled && speedConfig.initialCountIn > 0;
     setSpeedProgress({
       currentBpm: speedConfig.startBpm,
       currentBar: 1,
@@ -1402,14 +1445,13 @@ export default function App() {
   };
 
   const pauseSpeedTraining = () => {
-    audioEngine.stop();
+    audioEngine.pause();
     setIsPlaying(false);
     setSpeedProgress(prev => ({ ...prev, isPaused: true }));
   };
 
   const resumeSpeedTraining = () => {
     audioEngine.setBpm(speedProgress.currentBpm);
-    audioEngine.setTimeSignature(speedConfig.timeSignature);
     audioEngine.start();
     setIsPlaying(true);
     setSpeedProgress(prev => ({ ...prev, isPaused: false }));
@@ -1422,20 +1464,23 @@ export default function App() {
   };
 
   const startRatiosTraining = () => {
+    const hasCountIn = ratiosConfig.countInEnabled && ratiosConfig.initialCountIn > 0;
     audioEngine.stop();
-    const ts = { beats: ratiosConfig.numberOfBeats, noteValue: 4 };
-    audioEngine.setTimeSignature(ts);
+    if (hasCountIn) configureQuarterNoteCountIn(ratiosConfig.initialCountIn);
+    else {
+      audioEngine.setTimeSignature({ beats: ratiosConfig.numberOfBeats, noteValue: 4 });
+      audioEngine.setSubdivision(ratiosConfig.loop1);
+    }
     audioEngine.setBpm(ratiosConfig.bpm);
-    audioEngine.setSubdivision(ratiosConfig.loop1);
     audioEngine.start();
     setIsPlaying(true);
 
-    const hasCountIn = ratiosConfig.countInEnabled && ratiosConfig.initialCountIn > 0;
     setRatiosProgress({
       activeLoop: 1,
       currentSubdivision: ratiosConfig.loop1,
       currentBeat: 1,
       countInRemaining: hasCountIn ? ratiosConfig.initialCountIn : 0,
+      countInTotal: hasCountIn ? ratiosConfig.initialCountIn : 0,
       isCountIn: hasCountIn,
       isActive: true,
       isPaused: false
@@ -1443,7 +1488,7 @@ export default function App() {
   };
 
   const pauseRatiosTraining = () => {
-    audioEngine.stop();
+    audioEngine.pause();
     setIsPlaying(false);
     setRatiosProgress(prev => ({ ...prev, isPaused: true }));
   };
@@ -1451,7 +1496,6 @@ export default function App() {
   const resumeRatiosTraining = () => {
     audioEngine.setBpm(ratiosConfig.bpm);
     audioEngine.setSubdivision(ratiosProgress.currentSubdivision);
-    audioEngine.setTimeSignature({ beats: ratiosConfig.numberOfBeats, noteValue: 4 });
     audioEngine.start();
     setIsPlaying(true);
     setRatiosProgress(prev => ({ ...prev, isPaused: false }));
@@ -1491,6 +1535,8 @@ export default function App() {
               s.currentBeat = 1;
               s.currentBar = 1;
               s.currentLoop = 1;
+              audioEngine.setTimeSignature(speedConfig.timeSignature);
+              audioEngine.setSubdivision(selectedSubdivision);
               return s;
             }
           }
@@ -1514,12 +1560,7 @@ export default function App() {
                 s.completedStages += 1;
                 const nextStageBpm = s.currentBpm + speedConfig.bpmIncrement;
 
-                if (s.currentBpm >= speedConfig.endBpm || nextStageBpm > speedConfig.endBpm) {
-                  if (s.currentBpm < speedConfig.endBpm) {
-                    s.currentBpm = speedConfig.endBpm;
-                    audioEngine.setBpm(speedConfig.endBpm);
-                    return s;
-                  }
+                if (s.currentBpm >= speedConfig.endBpm) {
                   s.stage = 'finished';
                   s.isActive = false;
                   audioEngine.stop();
@@ -1532,11 +1573,12 @@ export default function App() {
                   });
                   return s;
                 } else {
-                  s.currentBpm = nextStageBpm;
-                  audioEngine.setBpm(nextStageBpm);
+                  s.currentBpm = Math.min(speedConfig.endBpm, nextStageBpm);
+                  audioEngine.setBpm(s.currentBpm);
                   if (speedConfig.countInEnabled && speedConfig.speedIncreaseCountIn > 0) {
                     s.stage = 'increasing';
                     s.countInRemaining = speedConfig.speedIncreaseCountIn;
+                    configureQuarterNoteCountIn(speedConfig.speedIncreaseCountIn);
                   }
                 }
               }
@@ -1560,6 +1602,7 @@ export default function App() {
               r.currentBeat = 1;
               r.activeLoop = 1;
               r.currentSubdivision = ratiosConfig.loop1;
+              audioEngine.setTimeSignature({ beats: ratiosConfig.numberOfBeats, noteValue: 4 });
               audioEngine.setSubdivision(ratiosConfig.loop1);
               return r;
             }
@@ -1575,10 +1618,11 @@ export default function App() {
               if (r.activeLoop === 2 && ratiosConfig.countInEnabled && ratiosConfig.repeatCountIn > 0) {
                 r.isCountIn = true;
                 r.countInRemaining = ratiosConfig.repeatCountIn;
+                r.countInTotal = ratiosConfig.repeatCountIn;
                 r.currentBeat = 1;
                 r.activeLoop = 1;
                 r.currentSubdivision = ratiosConfig.loop1;
-                audioEngine.setSubdivision(ratiosConfig.loop1);
+                configureQuarterNoteCountIn(ratiosConfig.repeatCountIn);
                 return r;
               }
 
@@ -2083,64 +2127,18 @@ export default function App() {
   const renderDotVisualiser = (subdiv = selectedSubdivision, currentBpm = bpm, customBeatsCount = null) => {
     const beatsCount = customBeatsCount || timeSignature.beats || 4;
     const dotsCount = subdiv?.dotsPerBeat || 1;
-
     return (
-      <div className="w-full max-w-4xl mx-auto my-2 sm:my-3.5 select-none px-1">
-        <div className="grid gap-1.5 sm:gap-2.5 lg:gap-3" style={{ gridTemplateColumns: `repeat(${beatsCount}, minmax(0, 1fr))` }}>
+      <div className="w-full max-w-4xl mx-auto my-5 select-none px-1">
+        <div className="flex items-center justify-center gap-3 sm:gap-5 flex-wrap" aria-label="Beat subdivision visualizer">
           {Array.from({ length: beatsCount }).map((_, beatIdx) => {
             const beatNumber = beatIdx + 1;
-            const isCurrentBeat = isPlaying && activeDotInfo.beatNumber === beatNumber;
-            const isDownbeat = beatIdx === 0;
-
+            const activeBeat = isPlaying && activeDotInfo.beatNumber === beatNumber;
             return (
-              <div
-                key={beatIdx}
-                className="flex flex-col items-center justify-between py-2 sm:py-3 px-1 rounded-xl sm:rounded-2xl transition-all duration-75 relative overflow-hidden backdrop-blur-sm"
-                style={{
-                  backgroundColor: isCurrentBeat ? '#1A1A24' : '#12121A',
-                  border: isCurrentBeat
-                    ? `1px solid ${isDownbeat ? currentTheme.secondary : currentTheme.primary}`
-                    : '1px solid rgba(255,255,255,0.07)',
-                  boxShadow: isCurrentBeat
-                    ? `0 0 16px ${isDownbeat ? currentTheme.secondary : currentTheme.primary}40, inset 0 0 12px ${currentTheme.glowSubtle}`
-                    : 'none'
-                }}
-              >
-                {isCurrentBeat && (
-                  <div
-                    className="absolute top-0 left-0 right-0 h-[2px] transition-all"
-                    style={{ backgroundColor: isDownbeat ? currentTheme.secondary : currentTheme.primary }}
-                  />
-                )}
-
-                <div
-                  className="text-[10px] sm:text-xs font-semibold tracking-wider font-gx-code uppercase mb-1 sm:mb-1.5 transition-colors"
-                  style={{ color: isCurrentBeat ? currentTheme.primary : '#92929F' }}
-                >
-                  Beat {beatNumber}
-                </div>
-
-                <div className="flex items-center justify-center gap-1 sm:gap-1.5 flex-wrap min-h-[22px] sm:min-h-[28px] px-0.5">
-                  {Array.from({ length: dotsCount }).map((_, dotIdx) => {
-                    const isDotActive = isCurrentBeat && activeDotInfo.activeDotIndex === dotIdx;
-
-                    return (
-                      <div
-                        key={dotIdx}
-                        className={`rounded-full transition-all duration-75 ${
-                          dotsCount > 4 ? 'w-2 h-2 sm:w-2.5 sm:h-2.5' : 'w-2.5 h-2.5 sm:w-3.5 sm:h-3.5'
-                        }`}
-                        style={{
-                          backgroundColor: isDotActive
-                            ? (isDownbeat ? currentTheme.secondary : currentTheme.primary)
-                            : '#272736',
-                          boxShadow: isDotActive
-                            ? `0 0 14px ${isDownbeat ? currentTheme.secondary : currentTheme.primary}, 0 0 4px #FFFFFF`
-                            : 'none',
-                          transform: isDotActive ? 'scale(1.3)' : 'scale(1)'
-                        }}
-                      />
-                    );
+              <div key={beatIdx} className="flex flex-col items-center gap-3 min-w-0">
+                <div className="flex items-center justify-center gap-1.5 sm:gap-2 min-h-8">
+                  {Array.from({ length: dotsCount }).map((__, dotIdx) => {
+                    const active = activeBeat && activeDotInfo.activeDotIndex === dotIdx;
+                    return <span key={dotIdx} className="block rounded-full transition-all duration-75" style={{ width: dotsCount > 4 ? 8 : 12, height: dotsCount > 4 ? 8 : 12, background: active ? (beatIdx === 0 ? currentTheme.secondary : currentTheme.primary) : '#30303D', transform: active ? 'scale(1.45)' : 'scale(1)', boxShadow: active ? `0 0 14px ${beatIdx === 0 ? currentTheme.secondary : currentTheme.primary}` : 'none' }} />;
                   })}
                 </div>
               </div>
@@ -2150,6 +2148,13 @@ export default function App() {
       </div>
     );
   };
+
+  const renderNumberSetting = (label, value, min, max, step, onChange) => (
+    <div className="rounded-xl bg-[#101016] border border-white/5 p-3 space-y-2">
+      <div className="flex items-center justify-between gap-3"><label className="text-xs font-semibold text-[#B8B8C5]">{label}</label><div className="flex items-center gap-2"><button type="button" onClick={() => onChange(Math.max(min, Number(value) - step))} className="w-7 h-7 rounded-lg bg-[#242431] text-white">−</button><span className="min-w-9 text-center font-gx-num font-bold text-white">{value}</span><button type="button" onClick={() => onChange(Math.min(max, Number(value) + step))} className="w-7 h-7 rounded-lg bg-[#242431] text-white">+</button></div></div>
+      <input aria-label={label} type="range" min={min} max={max} step={step} value={value} onChange={e => onChange(Number(e.target.value))} className="w-full cursor-pointer" style={{ accentColor: currentTheme.primary }} />
+    </div>
+  );
 
   // ==========================================================================
   // RENDER: STEP METRONOME SUITE (Standard, Speed, and Ratios in Steps 1, 2, 3)
@@ -3544,14 +3549,17 @@ export default function App() {
 
               <div className="flex items-center gap-1 bg-[#15151D] p-1 rounded-xl border border-white/5">
                 {[
-                  { id: 'standard', label: 'Standard' },
-                  { id: 'speed', label: 'Speed Training' },
-                  { id: 'ratios', label: 'Ratios Training' },
+                  { id: 'standard', label: '♩ Metronome' },
+                  { id: 'speed', label: '⚡ Speed Training' },
+                  { id: 'ratios', label: '➗ Ratios Training' },
                 ].map(m => (
                   <button
                     key={m.id}
                     onClick={() => {
-                      setActiveMetronomeMode(m.id);
+                      if (activeMetronomeMode !== m.id) {
+                        stopAllMetronomes();
+                        setActiveMetronomeMode(m.id);
+                      }
                       audioEngine.playUiSound('step');
                     }}
                     className="px-3 sm:px-4 py-1.5 rounded-lg text-xs sm:text-sm font-semibold transition-all"
@@ -3772,157 +3780,50 @@ export default function App() {
 
             {/* Speed Training */}
             {activeMetronomeMode === 'speed' && (
-              <div className="bg-[#15151D] border border-white/5 rounded-2xl p-4 sm:p-6 lg:p-8 shadow-2xl space-y-4 w-full">
-                <div className="flex flex-col items-center justify-center pt-1 pb-1">
-                  <div className="text-fluid-bpm font-black font-gx-num tracking-tight text-white leading-none">
-                    {speedProgress.isActive ? speedProgress.currentBpm : speedConfig.startBpm}
+              <div className="bg-[#15151D] border border-white/5 rounded-2xl p-4 sm:p-6 lg:p-8 shadow-2xl space-y-5 w-full">
+                {!speedProgress.isActive ? <>
+                  <div className="text-center"><h3 className="text-lg font-bold text-white font-gx-display">Speed Training Setup</h3><p className="text-xs text-[#92929F] mt-1">Build speed gradually while keeping every note clean.</p></div>
+                  <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">{TIME_SIGNATURES.map(ts => <button key={ts.id} onClick={() => setSpeedConfig(p => ({...p, timeSignature:ts}))} className="py-2 rounded-xl border text-sm font-bold" style={{background: speedConfig.timeSignature.id===ts.id?currentTheme.accentBg:'#101016',borderColor:speedConfig.timeSignature.id===ts.id?currentTheme.primary:'rgba(255,255,255,.07)',color:speedConfig.timeSignature.id===ts.id?currentTheme.primary:'#92929F'}}>{ts.label}</button>)}</div>
+                  <div className="grid sm:grid-cols-2 gap-3">
+                    {renderNumberSetting('Start BPM',speedConfig.startBpm,30,320,1,v=>setSpeedConfig(p=>({...p,startBpm:Math.min(v,p.endBpm)})))}
+                    {renderNumberSetting('End BPM',speedConfig.endBpm,30,320,1,v=>setSpeedConfig(p=>({...p,endBpm:Math.max(v,p.startBpm)})))}
+                    {renderNumberSetting('BPM Increment',speedConfig.bpmIncrement,1,20,1,v=>setSpeedConfig(p=>({...p,bpmIncrement:v})))}
+                    {renderNumberSetting('Bars / Loop',speedConfig.barsPerLoop,1,32,1,v=>setSpeedConfig(p=>({...p,barsPerLoop:v})))}
+                    {renderNumberSetting('Loops before increase',speedConfig.loopsBeforeIncrease,1,16,1,v=>setSpeedConfig(p=>({...p,loopsBeforeIncrease:v})))}
                   </div>
-                  <div className="text-[10px] sm:text-xs uppercase tracking-widest text-[#92929F] font-bold font-gx-display mt-1">
-                    Beats Per Minute
-                  </div>
-                </div>
-
-                {renderDotVisualiser(
-                  selectedSubdivision,
-                  speedProgress.isActive ? speedProgress.currentBpm : speedConfig.startBpm,
-                  speedConfig.timeSignature.beats
-                )}
-
-                <div className="bg-[#101016] p-3 rounded-xl border border-white/5 flex items-center justify-between flex-wrap gap-2 text-xs sm:text-sm">
-                  <div className="text-[#92929F] flex items-center gap-2 font-gx-num">
-                    <span>Target: <strong className="text-white font-bold">{speedConfig.endBpm}</strong></span>
-                    &bull;
-                    <span>Bar: <strong style={{ color: currentTheme.primary }}>{speedProgress.currentBar}/{speedConfig.barsPerLoop}</strong></span>
-                    &bull;
-                    <span>Loop: <strong style={{ color: currentTheme.primary }}>{speedProgress.currentLoop}/{speedConfig.loopsBeforeIncrease}</strong></span>
-                  </div>
-
-                  <div className="flex items-center gap-2">
-                    <span
-                      className="text-[10px] sm:text-xs px-2.5 py-0.5 rounded-full font-bold uppercase tracking-wider border font-gx-code"
-                      style={{
-                        backgroundColor: speedProgress.stage === 'playing' ? 'rgba(16,185,129,0.15)' : currentTheme.accentBg,
-                        borderColor: speedProgress.stage === 'playing' ? '#10B981' : currentTheme.primary,
-                        color: speedProgress.stage === 'playing' ? '#10B981' : currentTheme.primary
-                      }}
-                    >
-                      {speedProgress.stage}
-                    </span>
-                    {speedProgress.countInRemaining > 0 && (
-                      <span className="text-[11px] sm:text-xs font-mono font-bold" style={{ color: currentTheme.primary }}>
-                        C-In: {speedProgress.countInRemaining}
-                      </span>
-                    )}
-                  </div>
-                </div>
-
-                <div className="flex items-center justify-center gap-2 py-1 flex-wrap">
-                  {!speedProgress.isActive ? (
-                    <button
-                      onClick={startSpeedTraining}
-                      className="px-6 py-2.5 sm:py-3 rounded-2xl text-white font-extrabold text-xs sm:text-sm flex items-center gap-1.5 transition-all active:scale-95 font-gx-display"
-                      style={{
-                        backgroundColor: currentTheme.primary,
-                        boxShadow: `0 0 15px ${currentTheme.glow}`
-                      }}
-                    >
-                      <Play className="w-4 h-4 fill-current" />
-                      START SPEED TRAINING
-                    </button>
-                  ) : speedProgress.isPaused ? (
-                    <button
-                      onClick={resumeSpeedTraining}
-                      className="px-6 py-2.5 sm:py-3 rounded-2xl bg-[#10B981] text-white font-extrabold text-xs sm:text-sm flex items-center gap-1.5 hover:brightness-110 active:scale-95 font-gx-display"
-                    >
-                      <Play className="w-4 h-4 fill-current" />
-                      RESUME
-                    </button>
-                  ) : (
-                    <button
-                      onClick={pauseSpeedTraining}
-                      className="px-6 py-2.5 sm:py-3 rounded-2xl bg-[#3B82F6] text-white font-extrabold text-xs sm:text-sm flex items-center gap-1.5 hover:brightness-110 active:scale-95 font-gx-display"
-                    >
-                      <Pause className="w-4 h-4 fill-current" />
-                      PAUSE
-                    </button>
+                  <div className="rounded-xl bg-[#101016] border border-white/5 p-3 space-y-3"><label className="flex items-center justify-between text-sm text-white font-semibold">Count In <button type="button" onClick={()=>setSpeedConfig(p=>({...p,countInEnabled:!p.countInEnabled}))} className="px-4 py-1.5 rounded-full text-xs font-bold" style={{background:speedConfig.countInEnabled?currentTheme.primary:'#30303D',color:'#fff'}}>{speedConfig.countInEnabled?'ON':'OFF'}</button></label>{speedConfig.countInEnabled&&<div className="grid sm:grid-cols-2 gap-3">{renderNumberSetting('Initial Count In',speedConfig.initialCountIn,0,16,1,v=>setSpeedConfig(p=>({...p,initialCountIn:v})))}{renderNumberSetting('Speed ↑ Count In',speedConfig.speedIncreaseCountIn,0,16,1,v=>setSpeedConfig(p=>({...p,speedIncreaseCountIn:v})))}</div>}</div>
+                  <button onClick={startSpeedTraining} className="w-full py-4 rounded-xl text-white font-extrabold tracking-wide" style={{background:currentTheme.primary,boxShadow:`0 0 18px ${currentTheme.glow}`}}>▶ START TRAINING</button>
+                </> : <>
+                  <div className="text-center space-y-1"><div className="text-xs uppercase tracking-[.2em] font-bold" style={{color:currentTheme.primary}}>{speedProgress.stage==='countin'||speedProgress.stage==='increasing'?`↻ COUNT IN · ${speedProgress.countInRemaining}`:`LOOP ${speedProgress.currentLoop}/${speedConfig.loopsBeforeIncrease} · BAR ${speedProgress.currentBar}/${speedConfig.barsPerLoop}`}</div><div className="text-fluid-bpm font-black font-gx-num text-white" style={{color:currentTheme.primary}}>{speedProgress.currentBpm}</div><div className="text-[10px] uppercase tracking-widest text-[#92929F]">Beats per minute</div></div>
+                  {renderDotVisualiser(
+                    speedProgress.stage === 'countin' || speedProgress.stage === 'increasing' ? SUBDIVISIONS[0] : selectedSubdivision,
+                    speedProgress.currentBpm,
+                    speedProgress.stage === 'countin' ? speedConfig.initialCountIn : speedProgress.stage === 'increasing' ? speedConfig.speedIncreaseCountIn : speedConfig.timeSignature.beats
                   )}
-
-                  {speedProgress.isActive && (
-                    <button
-                      onClick={stopSpeedTraining}
-                      className="px-4 py-2.5 sm:py-3 rounded-2xl bg-[#EF4444] text-white font-bold text-xs sm:text-sm flex items-center gap-1 hover:brightness-110 active:scale-95 font-gx-display"
-                    >
-                      <Square className="w-3.5 h-3.5 fill-current" />
-                      STOP
-                    </button>
-                  )}
-
-                  <button
-                    onClick={startSpeedTraining}
-                    className="px-4 py-2.5 sm:py-3 rounded-2xl bg-[#1B1B25] border border-white/5 text-white font-semibold text-xs sm:text-sm flex items-center gap-1 hover:bg-[#252533] active:scale-95 font-gx-display"
-                  >
-                    <RotateCcw className="w-3.5 h-3.5" />
-                    RESTART
-                  </button>
-                </div>
+                  <div className="flex items-center justify-between text-xs text-[#92929F]"><span>Target <b className="text-white">{speedConfig.endBpm} BPM</b></span><span>Stage {speedProgress.completedStages+1}/{speedProgress.totalStages}</span></div>
+                  <div className="flex gap-2"><button onClick={speedProgress.isPaused?resumeSpeedTraining:pauseSpeedTraining} className="flex-1 py-3 rounded-xl text-white font-bold" style={{background:speedProgress.isPaused?'#159B69':'#3269C8'}}>{speedProgress.isPaused?'▶ RESUME':'Ⅱ PAUSE'}</button><button onClick={stopSpeedTraining} className="w-14 rounded-xl text-white bg-[#9F2636]">■</button></div>
+                </>}
               </div>
             )}
 
             {/* Ratios Training */}
             {activeMetronomeMode === 'ratios' && (
-              <div className="bg-[#15151D] border border-white/5 rounded-2xl p-4 sm:p-6 lg:p-8 shadow-2xl space-y-4 w-full">
-                <div className="flex flex-col items-center justify-center pt-1 pb-1">
-                  <div className="text-fluid-bpm font-black font-gx-num tracking-tight text-white leading-none">
-                    {ratiosConfig.bpm}
-                  </div>
-                  <div className="text-[10px] sm:text-xs uppercase tracking-widest text-[#92929F] font-bold font-gx-display mt-1">
-                    Beats Per Minute
-                  </div>
-                </div>
-
-                {renderDotVisualiser(
-                  ratiosProgress.isActive ? ratiosProgress.currentSubdivision : ratiosConfig.loop1,
-                  ratiosConfig.bpm,
-                  ratiosConfig.numberOfBeats
-                )}
-
-                <div className="bg-[#101016] p-3 rounded-xl border border-white/5 flex items-center justify-between flex-wrap gap-2 text-xs sm:text-sm">
-                  <div>
-                    <div className="font-gx-display text-white flex items-center gap-1.5 font-bold text-xs sm:text-sm">
-                      Loop {ratiosProgress.activeLoop}:
-                      <span style={{ color: currentTheme.primary }}>
-                        {ratiosProgress.currentSubdivision.name}
-                      </span>
-                    </div>
-                    <div className="text-[10px] sm:text-xs text-[#92929F] font-gx-num">
-                      Beat {ratiosProgress.currentBeat} of {ratiosConfig.numberOfBeats}
-                    </div>
-                  </div>
-                </div>
-
-                <div className="flex items-center justify-center gap-2 py-1">
-                  {!ratiosProgress.isActive ? (
-                    <button
-                      onClick={startRatiosTraining}
-                      className="px-6 py-2.5 sm:py-3 rounded-2xl text-white font-extrabold text-xs sm:text-sm flex items-center gap-1.5 transition-all active:scale-95 font-gx-display"
-                      style={{
-                        backgroundColor: currentTheme.primary,
-                        boxShadow: `0 0 15px ${currentTheme.glow}`
-                      }}
-                    >
-                      <Play className="w-4 h-4 fill-current" />
-                      START RATIOS TRAINING
-                    </button>
-                  ) : (
-                    <button
-                      onClick={stopRatiosTraining}
-                      className="px-6 py-2.5 sm:py-3 rounded-2xl bg-[#EF4444] text-white font-extrabold text-xs sm:text-sm flex items-center gap-1.5 active:scale-95 font-gx-display"
-                    >
-                      <Square className="w-4 h-4 fill-current" />
-                      STOP
-                    </button>
+              <div className="bg-[#15151D] border border-white/5 rounded-2xl p-4 sm:p-6 lg:p-8 shadow-2xl space-y-5 w-full">
+                {!ratiosProgress.isActive ? <>
+                  <div className="text-center"><h3 className="text-lg font-bold text-white font-gx-display">Ratios Training Setup</h3><p className="text-xs text-[#92929F] mt-1">Alternate rhythmic subdivisions without losing the pulse.</p></div>
+                  <div className="grid sm:grid-cols-2 gap-3">{renderNumberSetting('BPM',ratiosConfig.bpm,30,320,1,v=>setRatiosConfig(p=>({...p,bpm:v})))}{renderNumberSetting('# of Beats',ratiosConfig.numberOfBeats,1,16,1,v=>setRatiosConfig(p=>({...p,numberOfBeats:v})))}</div>
+                  <div className="rounded-xl bg-[#101016] border border-white/5 p-3 space-y-3"><label className="flex items-center justify-between text-sm text-white font-semibold">Count In <button type="button" onClick={()=>setRatiosConfig(p=>({...p,countInEnabled:!p.countInEnabled}))} className="px-4 py-1.5 rounded-full text-xs font-bold" style={{background:ratiosConfig.countInEnabled?currentTheme.primary:'#30303D',color:'#fff'}}>{ratiosConfig.countInEnabled?'ON':'OFF'}</button></label>{ratiosConfig.countInEnabled&&<div className="grid sm:grid-cols-2 gap-3">{renderNumberSetting('Initial Count In',ratiosConfig.initialCountIn,0,16,1,v=>setRatiosConfig(p=>({...p,initialCountIn:v})))}{renderNumberSetting('Repeat Count In',ratiosConfig.repeatCountIn,0,16,1,v=>setRatiosConfig(p=>({...p,repeatCountIn:v})))}</div>}</div>
+                  <div className="rounded-xl bg-[#101016] border border-white/5 p-3 space-y-3"><label className="flex items-center justify-between text-sm text-white font-semibold">Subdivision Ratio <button type="button" onClick={()=>setRatiosConfig(p=>({...p,subdivisionRatioEnabled:!p.subdivisionRatioEnabled}))} className="px-4 py-1.5 rounded-full text-xs font-bold" style={{background:ratiosConfig.subdivisionRatioEnabled?currentTheme.primary:'#30303D',color:'#fff'}}>{ratiosConfig.subdivisionRatioEnabled?'ON':'OFF'}</button></label>{ratiosConfig.subdivisionRatioEnabled&&<div className="grid sm:grid-cols-2 gap-3">{[['Loop 1','loop1'],['Loop 2','loop2']].map(([label,key])=><label key={key} className="text-xs text-[#92929F] space-y-2">{label}<select value={ratiosConfig[key].id} onChange={e=>setRatiosConfig(p=>({...p,[key]:SUBDIVISIONS.find(x=>x.id===e.target.value)||p[key]}))} className="w-full p-3 rounded-lg bg-[#20202B] text-white border border-white/10">{SUBDIVISIONS.filter(x=>x.id!=='quarter').map(x=><option key={x.id} value={x.id}>{x.name}</option>)}</select></label>)}</div>}</div>
+                  <button onClick={startRatiosTraining} className="w-full py-4 rounded-xl text-white font-extrabold tracking-wide" style={{background:currentTheme.primary,boxShadow:`0 0 18px ${currentTheme.glow}`}}>▶ START TRAINING</button>
+                </> : <>
+                  <div className="text-center space-y-1"><div className="text-xs uppercase tracking-[.2em] font-bold" style={{color:currentTheme.primary}}>{ratiosProgress.isCountIn?`↻ COUNT IN ${ratiosProgress.countInRemaining}`:`BEAT ${ratiosProgress.currentBeat}/${ratiosConfig.numberOfBeats} · LOOP ${ratiosProgress.activeLoop}`}</div><div className="text-fluid-bpm font-black font-gx-num" style={{color:currentTheme.primary}}>{ratiosConfig.bpm}</div><div className="text-[10px] uppercase tracking-widest text-[#92929F]">{ratiosProgress.currentSubdivision.name}</div></div>
+                  {renderDotVisualiser(
+                    ratiosProgress.isCountIn ? SUBDIVISIONS[0] : ratiosProgress.currentSubdivision,
+                    ratiosConfig.bpm,
+                    ratiosProgress.isCountIn ? ratiosProgress.countInTotal : ratiosConfig.numberOfBeats
                   )}
-                </div>
+                  <div className="flex gap-2"><button onClick={ratiosProgress.isPaused?resumeRatiosTraining:pauseRatiosTraining} className="flex-1 py-3 rounded-xl text-white font-bold" style={{background:ratiosProgress.isPaused?'#159B69':'#3269C8'}}>{ratiosProgress.isPaused?'▶ RESUME':'Ⅱ PAUSE'}</button><button onClick={stopRatiosTraining} className="w-14 rounded-xl text-white bg-[#9F2636]">■</button></div>
+                </>}
               </div>
             )}
           </div>
